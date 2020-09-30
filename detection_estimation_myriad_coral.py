@@ -29,7 +29,7 @@ logging.basicConfig(format="[ %(levelname)s ] %(message)s",
                     stream=sys.stdout)
 log = logging.getLogger()
 
-labels = ['Background','Person','Other']
+labels = ['Background','Person','Bicycle','Car','Motorcycle']
 
 EDGES = (
     ('nose', 'left eye'),
