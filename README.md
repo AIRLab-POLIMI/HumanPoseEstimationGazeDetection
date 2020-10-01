@@ -2,7 +2,7 @@ Be sure to install correctly OpenVino and EdgeTPU. Follow the documentation prov
 
 Running the application with the `-h` option yields the following usage message:
 ```
-usage: single_human_pose_estimation_demo.py [-h] -m_od MODEL_OD -m_hpe
+usage: detect_estimation_myriad_coral.py [-h] -m_od MODEL_OD -m_hpe
                                             MODEL_HPE [-i INPUT [INPUT ...]]
                                             [-d DEVICE]
                                             [--person_label PERSON_LABEL]
