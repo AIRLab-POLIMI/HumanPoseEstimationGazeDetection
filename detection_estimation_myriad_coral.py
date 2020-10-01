@@ -29,7 +29,7 @@ logging.basicConfig(format="[ %(levelname)s ] %(message)s",
                     stream=sys.stdout)
 log = logging.getLogger()
 
-labels = ['Background','Person','Car', 'Bus', 'Bicycle','Motorcycle']
+labels = ['Background','Person','Car', 'Bus', 'Bicycle','Motorcycle'] #???
 
 EDGES = (
     ('nose', 'left eye'),
@@ -59,15 +59,15 @@ EDGES = (
 
 def build_argparser():
     parser = argparse.ArgumentParser()
-    parser.add_argument("-m_od", "--model_od", type=str, required=True,
+    parser.add_argument("-m_od", "--model_od", type=str, default= "mobilenet-ssd.xml",
                         help="path to model of object detector to be infered in NCS2, in xml format")
 
     parser.add_argument("-m_hpe", "--model_hpe", default="models/posenet_mobilenet_v1_075_481_641_quant_decoder_edgetpu.tflite", type=str,
                             help="path to model of human pose estimator to be infered in Google Coral TPU, TFlite model. Assigned one by default")
 
-    parser.add_argument("-i", "--input", type=str, nargs='+', default='', help="path to video or image/images")
-    parser.add_argument("-d", "--device", type=str, default='CPU', required=False,
-                        help="Specify the target to infer on CPU or GPU")
+    parser.add_argument("-i", "--input", type=str, nargs='+', default='0', help="path to video or image/images")
+    parser.add_argument("-d", "--device", type=str, default='MYRIAD', required=False,
+                        help="Specify the target to infer on CPU, GPU, or MYRIAD")
     parser.add_argument("--person_label", type=int, required=False, default=1, help="Label of class person for detector")
     parser.add_argument("--no_show", help='Optional. Do not display output.', action='store_true')
     
@@ -189,7 +189,6 @@ def run_demo(args):
         print(labels_detected)
         print("SCORE DETECTED\n")
         print(score_detected)
-        print("\n")
 
         colors = [(0, 0, 255),
                   (255, 0, 0), (0, 255, 0), (255, 0, 0), (0, 255, 0),
@@ -199,16 +198,17 @@ def run_demo(args):
         if res:
             detectframecount += 1
             imdraw = overlay_on_image(color_image, res, model_width, model_height)
-            #imdraw = cv2.resize(imdraw,None,fx=2, fy=2, interpolation = cv2.INTER_LINEAR)
             
         else:
             imdraw = color_image
-            #imdraw = cv2.resize(imdraw,None,fx=2, fy=2, interpolation = cv2.INTER_LINEAR)
-
-        for i, bbox in enumerate(bboxes):
+        
+        i=0
+        for bbox in bboxes:
             cv2.rectangle(imdraw, (bbox[0], bbox[1]), (bbox[0] + bbox[2], bbox[1] + bbox[3]), (0, 0, 255), 1)
             #cv2.putText(imdraw, labels[args.person_label], (bbox[0]+3,bbox[1]-7), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255,255,255))
-            cv2.putText(imdraw, labels_detected[i].astype(int) , (bbox[0]+3,bbox[1]-7), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255,255,255))
+            if len(labels_detected)>0:
+                cv2.putText(imdraw, labels[labels_detected[i].astype(int)], (bbox[0]+3,bbox[1]-7), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255,255,255))
+                i+=1
             
         framecount += 1
         if framecount >= 15:

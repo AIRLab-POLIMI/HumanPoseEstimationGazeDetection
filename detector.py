@@ -11,7 +11,7 @@ log = logging.getLogger()
 
 
 class Detector(object):
-    def __init__(self, ie, path_to_model_xml, device, label_class, scale=None, thr=0.75):
+    def __init__(self, ie, path_to_model_xml, device, label_class, scale=None, thr=0.85):
         self.OUTPUT_SIZE = 7
         self.CHANNELS_SIZE = 3
         log.info('DETECTOR - Loading IR to the plugin...')
