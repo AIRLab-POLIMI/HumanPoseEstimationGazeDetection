@@ -29,7 +29,7 @@ logging.basicConfig(format="[ %(levelname)s ] %(message)s",
                     stream=sys.stdout)
 log = logging.getLogger()
 
-labels = ['Background','Person','Bicycle','Car','Motorcycle']
+labels = ['Background','Person','Car', 'Bus', 'Bicycle','Motorcycle']
 
 EDGES = (
     ('nose', 'left eye'),
@@ -184,7 +184,12 @@ def run_demo(args):
         tinf = time.perf_counter()
         res, inference_time = engine.DetectPosesInImage(prepimg)
         
-        bboxes = detector_person.detect(frame)
+        bboxes, labels_detected, score_detected = detector_person.detect(frame)        
+        print("LABELS DETECTED\n")
+        print(labels_detected)
+        print("SCORE DETECTED\n")
+        print(score_detected)
+        print("\n")
 
         colors = [(0, 0, 255),
                   (255, 0, 0), (0, 255, 0), (255, 0, 0), (0, 255, 0),
@@ -200,9 +205,10 @@ def run_demo(args):
             imdraw = color_image
             #imdraw = cv2.resize(imdraw,None,fx=2, fy=2, interpolation = cv2.INTER_LINEAR)
 
-        for bbox in bboxes:
+        for i, bbox in enumerate(bboxes):
             cv2.rectangle(imdraw, (bbox[0], bbox[1]), (bbox[0] + bbox[2], bbox[1] + bbox[3]), (0, 0, 255), 1)
-            cv2.putText(imdraw, labels[args.person_label], (bbox[0]+3,bbox[1]-7), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255,255,255))
+            #cv2.putText(imdraw, labels[args.person_label], (bbox[0]+3,bbox[1]-7), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255,255,255))
+            cv2.putText(imdraw, labels_detected[i].astype(int) , (bbox[0]+3,bbox[1]-7), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255,255,255))
             
         framecount += 1
         if framecount >= 15:
