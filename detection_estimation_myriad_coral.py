@@ -29,7 +29,6 @@ logging.basicConfig(format="[ %(levelname)s ] %(message)s",
                     stream=sys.stdout)
 log = logging.getLogger()
 
-labels = ['Background','Person','Car', 'Bus', 'Bicycle','Motorcycle'] #???
 
 EDGES = (
     ('nose', 'left eye'),
@@ -152,6 +151,23 @@ def run_demo(args):
     camera_height = 480
     model_width   = 640
     model_height  = 480
+    
+    if args.model_od == "mobilenet-ssd.xml":
+        labels = ['Background','Person','Car', 'Bus', 'Bicycle','Motorcycle'] #???
+    elif args.model_od == "ssdlite_mobilenet_v2.xml":
+        labels = [" ",]
+        file1 = open("labels.txt", 'r')
+        while True:
+            line = file1.readline().rstrip().split()
+            if len(line) == 1: line = " "
+            elif len(line) == 2: line = line[1]
+            elif len(line) == 3: line = line[1] + " " + line[2]
+            labels.append(line)
+            if not line:
+                labels.pop()
+                break
+        file1.close()
+            
     
     devices = edgetpu_utils.ListEdgeTpuPaths(edgetpu_utils.EDGE_TPU_STATE_UNASSIGNED)
     engine = PoseEngine(args.model_hpe, devices[0])
