@@ -68,6 +68,7 @@ def build_argparser():
     parser.add_argument("-d", "--device", type=str, default='MYRIAD', required=False,
                         help="Specify the target to infer on CPU, GPU, or MYRIAD")
     parser.add_argument("--person_label", type=int, required=False, default=1, help="Label of class person for detector")
+    parser.add_argument("--modality", type=str, default="Multi", help="Define the modality of representation of the output. Set single to visualize the skeleton of the main actor")
     parser.add_argument("--no_show", help='Optional. Do not display output.', action='store_true')
     
     return parser
@@ -110,21 +111,36 @@ class VideoReader(object):
         if not was_read:
             raise StopIteration
         return img
-def draw_pose(img, pose, threshold=0.2):
+        
+def draw_pose(img, pose, person, mode,threshold=0.4):
     xys = {}
-    for label, keypoint in pose.keypoints.items():
-        if keypoint.score < threshold: continue
-        xys[label] = (int(keypoint.yx[1]), int(keypoint.yx[0]))
-        img = cv2.circle(img, (int(keypoint.yx[1]), int(keypoint.yx[0])), 5, (0, 255, 0), -1)
+    if mode == "single":
+        for label, keypoint in pose.keypoints.items():
+            if keypoint.score < threshold: continue
+            xys[label] = (int(keypoint.yx[1]), int(keypoint.yx[0]))
+            if (keypoint.yx[1]>person[0] and keypoint.yx[1]<(person[0]+person[2])) and (keypoint.yx[0]>person[1] and keypoint.yx[0]<(person[1]+person[3])):
+                img = cv2.circle(img, (int(keypoint.yx[1]), int(keypoint.yx[0])), 5, (0, 255, 0), -1)
+                cv2.putText(img, label, (int(keypoint.yx[1])+3, int(keypoint.yx[0])-7), cv2.FONT_HERSHEY_SIMPLEX, 0.3, (255,255,255))
+    else:
+        for label, keypoint in pose.keypoints.items():
+            if keypoint.score < threshold: continue
+            xys[label] = (int(keypoint.yx[1]), int(keypoint.yx[0]))
+            img = cv2.circle(img, (int(keypoint.yx[1]), int(keypoint.yx[0])), 5, (0, 255, 0), -1)
+            cv2.putText(img, label, (int(keypoint.yx[1])+3, int(keypoint.yx[0])-7), cv2.FONT_HERSHEY_SIMPLEX, 0.3, (255,255,255))
+        
 
     for a, b in EDGES:
         if a not in xys or b not in xys: continue
         ax, ay = xys[a]
         bx, by = xys[b]
-        img = cv2.line(img, (ax, ay), (bx, by), (0, 255, 255), 2)
+        if mode == "single":
+            if ax>person[0] and ax<(person[0]+person[2]) and ay>person[1] and ay<(person[1]+person[3]):
+                img = cv2.line(img, (ax, ay), (bx, by), (255,0,0), 2)
+        else:
+            img = cv2.line(img, (ax, ay), (bx, by), (255,0,0), 2)
 
 
-def overlay_on_image(frames, result, model_width, model_height):
+def overlay_on_image(frames, result, model_width, model_height,person,mode):
 
     color_image = frames
 
@@ -133,7 +149,7 @@ def overlay_on_image(frames, result, model_width, model_height):
     img_cp = color_image.copy()
 
     for pose in result:
-        draw_pose(img_cp, pose)
+        draw_pose(img_cp, pose, person,mode)
 
     return img_cp
 
@@ -191,20 +207,29 @@ def run_demo(args):
     for frame in frames_reader:
         
         t1 = time.perf_counter()
-        color_image = frame
 
         # Run inference.
+        bboxes, labels_detected, score_detected, bboxes_person = detector_person.detect(frame)
+        main_person = [0,0,0,0]
+        areas=[]
+        for bbox in bboxes_person:
+            area = bbox[2]*bbox[3]
+            areas.append(area)
+        if areas:
+            box_person_num = areas.index(max(areas))
+            main_person = [bboxes_person[box_person_num][0],bboxes_person[box_person_num][1],bboxes_person[box_person_num][2],bboxes_person[box_person_num][3]]
+            print(main_person)
+            
+        color_image = frame
         color_image = cv2.resize(color_image, (model_width, model_height))
-        prepimg = color_image[:, :, ::-1].copy()
-
-        tinf = time.perf_counter()
+        prepimg = color_image[:, :, ::-1].copy()         
         res, inference_time = engine.DetectPosesInImage(prepimg)
-        
-        bboxes, labels_detected, score_detected = detector_person.detect(frame)        
-        print("LABELS DETECTED\n")
+          
+        print("LABELS DETECTED")
         print(labels_detected)
-        print("SCORE DETECTED\n")
+        print("SCORE DETECTED")
         print(score_detected)
+        print("\n")
 
         colors = [(0, 0, 255),
                   (255, 0, 0), (0, 255, 0), (255, 0, 0), (0, 255, 0),
@@ -213,7 +238,7 @@ def run_demo(args):
                   (255, 0, 0), (0, 255, 0), (255, 0, 0), (0, 255, 0)]
         if res:
             detectframecount += 1
-            imdraw = overlay_on_image(color_image, res, model_width, model_height)
+            imdraw = overlay_on_image(color_image, res, model_width, model_height, main_person, args.modality)
             
         else:
             imdraw = color_image

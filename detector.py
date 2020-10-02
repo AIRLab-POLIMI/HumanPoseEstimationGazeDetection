@@ -79,11 +79,12 @@ class Detector(object):
         bboxes_new = [coord_translation(bbox[3:]) for bbox in bboxes if bbox[2] > self._thr]       
         labels_detected = [bbox[1] for bbox in bboxes if bbox[2] > self._thr]        
         score_detected = [bbox[2] for bbox in bboxes if bbox[2] > self._thr]
+        bboxes_person = [coord_translation(bbox[3:]) for bbox in bboxes if bbox[1] == self._label_class and bbox[2] > self._thr]
 
-        return bboxes_new, labels_detected, score_detected
+        return bboxes_new, labels_detected, score_detected, bboxes_person
 
     def detect(self, img):
         img = self._preprocess(img)
         output = self._infer(img)
-        bboxes, labels_detected, score_detected = self._postprocess(output[self._output_layer_name][0][0])
-        return bboxes, labels_detected, score_detected 
+        bboxes, labels_detected, score_detected, bboxes_person = self._postprocess(output[self._output_layer_name][0][0])
+        return bboxes, labels_detected, score_detected, bboxes_person
