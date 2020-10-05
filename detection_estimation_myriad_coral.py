@@ -7,6 +7,7 @@ import cv2
 import time
 import numpy as np
 from PIL import Image
+import csv
 
 from edgetpu.basic import edgetpu_utils
 from pose_engine import PoseEngine
@@ -128,9 +129,19 @@ def elaborate_pose(result, threshold=0.7):  #the order of the first keypoints is
                     or label == "left ear" or label == "right ear") and keypoint.score > threshold:
                     xys[label] = (int(keypoint.yx[1]), int(keypoint.yx[0]))
                else: xys[label] = (-1,-1)
-    head = np.zeros(5)
-    head = [ [xys["nose"][0], xys["nose"][1]], [xys["left eye"][0], xys["left eye"][1]],[xys["right eye"][0], xys["right eye"][1]],[xys["left ear"][0], \
-                                                                                    xys["left ear"][1]],[xys["right ear"][0], xys["right ear"][1]] ] 
+    head = np.zeros((5,2))
+    head[0][0] = xys["nose"][0]
+    head[0][1] = xys["nose"][1]
+    head[1][0] = xys["left eye"][0]
+    head[1][1] = xys["left eye"][1]
+    head[2][0] = xys["right eye"][0]
+    head[2][1] = xys["right eye"][1]
+    head[3][0] = xys["left ear"][0]
+    head[3][1] = xys["left ear"][1]
+    head[4][0] = xys["right ear"][0]
+    head[4][1] = xys["right ear"][1]
+    ts = time.time()
+    return head, ts
     print(head)
         
 def draw_pose(img, pose, person, mode, i, threshold=0.7):
@@ -236,6 +247,11 @@ def run_demo(args):
     else:
         raise ValueError('--input has to be set')
     
+    csv_out = open('data_out.csv', mode='w')
+    time_stamps = open('timestamps.csv', mode='w')
+    writer_data = csv.writer(csv_out, dialect='excel')
+    writer_ts = csv.writer(time_stamps, dialect='excel')
+    
     for frame in frames_reader:
         
         t1 = time.perf_counter()
@@ -271,7 +287,9 @@ def run_demo(args):
         if res:
             detectframecount += 1
             imdraw = overlay_on_image(color_image, res, model_width, model_height, main_person, args.modality)
-            elaborate_pose(res)
+            head, ts = elaborate_pose(res)
+            print(type(head))
+            writer_data.writerow([ts, head.tobytes()])
             
         else:
             imdraw = color_image
