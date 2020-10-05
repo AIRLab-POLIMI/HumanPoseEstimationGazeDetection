@@ -93,15 +93,19 @@ class ImageReader(object):
 
 
 class VideoReader(object):
-    def __init__(self, file_name):
+    def __init__(self, file_name, width, height):
         try:
             self.file_name = int(file_name[0])
         except:
             self.file_name = file_name[0]
+        self.width = width
+        self.height = height
 
 
     def __iter__(self):
         self.cap = cv2.VideoCapture(self.file_name)
+        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.width)
+        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.height)
         if not self.cap.isOpened():
             raise IOError('Video {} cannot be opened'.format(self.file_name))
         return self
@@ -112,7 +116,24 @@ class VideoReader(object):
             raise StopIteration
         return img
         
-def draw_pose(img, pose, person, mode,threshold=0.4):
+def elaborate_pose(result, threshold=0.7):  #the order of the first keypoints is given in pose_engine.py (var list KEYPOINTS)
+    i=0
+    print("<------------POSE DATA------------->")
+    xys = {}
+    for pose in result:
+       i+=1
+       for label, keypoint in pose.keypoints.items(): 
+           if i==1 :     #if the pose is the main one
+               if (label == "nose" or label == "left eye" or label == "right eye" \
+                    or label == "left ear" or label == "right ear") and keypoint.score > threshold:
+                    xys[label] = (int(keypoint.yx[1]), int(keypoint.yx[0]))
+               else: xys[label] = (-1,-1)
+    head = np.zeros(5)
+    head = [ [xys["nose"][0], xys["nose"][1]], [xys["left eye"][0], xys["left eye"][1]],[xys["right eye"][0], xys["right eye"][1]],[xys["left ear"][0], \
+                                                                                    xys["left ear"][1]],[xys["right ear"][0], xys["right ear"][1]] ] 
+    print(head)
+        
+def draw_pose(img, pose, person, mode, i, threshold=0.7):
     xys = {}
     if mode == "single":
         for label, keypoint in pose.keypoints.items():
@@ -125,10 +146,11 @@ def draw_pose(img, pose, person, mode,threshold=0.4):
         for label, keypoint in pose.keypoints.items():
             if keypoint.score < threshold: continue
             xys[label] = (int(keypoint.yx[1]), int(keypoint.yx[0]))
-            img = cv2.circle(img, (int(keypoint.yx[1]), int(keypoint.yx[0])), 5, (0, 255, 0), -1)
-            cv2.putText(img, label, (int(keypoint.yx[1])+3, int(keypoint.yx[0])-7), cv2.FONT_HERSHEY_SIMPLEX, 0.3, (255,255,255))
+            if i == 1:
+                img = cv2.circle(img, (int(keypoint.yx[1]), int(keypoint.yx[0])), 5, (0, 255, 0), -1)
+                cv2.putText(img, label+str(i), (int(keypoint.yx[1])+3, int(keypoint.yx[0])-7), cv2.FONT_HERSHEY_SIMPLEX, 0.3, (255,255,255))
+            
         
-
     for a, b in EDGES:
         if a not in xys or b not in xys: continue
         ax, ay = xys[a]
@@ -148,8 +170,10 @@ def overlay_on_image(frames, result, model_width, model_height,person,mode):
         return color_image
     img_cp = color_image.copy()
 
+    i=0;
     for pose in result:
-        draw_pose(img_cp, pose, person,mode)
+        i+=1
+        draw_pose(img_cp, pose, person, mode, i)
 
     return img_cp
 
@@ -163,14 +187,22 @@ def run_demo(args):
     time1 = 0
     time2 = 0
 
-    camera_width  = 640
-    camera_height = 480
+    if args.model_hpe == "models/posenet_mobilenet_v1_075_481_641_quant_decoder_edgetpu.tflite":
+        camera_width  = 640
+        camera_height = 480
+    elif args.model_hpe == "models/posenet_mobilenet_v1_075_353_481_quant_decoder_edgetpu.tflite":
+        camera_width  = 480
+        camera_height = 360
+    else:
+        camera_width  = 1280
+        camera_height = 720
+        
     model_width   = 640
     model_height  = 480
     
     if args.model_od == "mobilenet-ssd.xml":
         labels = ['Background','Person','Car', 'Bus', 'Bicycle','Motorcycle'] #???
-    elif args.model_od == "ssdlite_mobilenet_v2.xml":
+    elif args.model_od == "ssdlite_mobilenet_v2/FP16/ssdlite_mobilenet_v2.xml" or "ssdlite_mobilenet_v2/FP32/ssdlite_mobilenet_v2.xml" :
         labels = [" ",]
         file1 = open("labels.txt", 'r')
         while True:
@@ -200,7 +232,7 @@ def run_demo(args):
         
     if args.input != '':
         img = cv2.imread(args.input[0], cv2.IMREAD_COLOR)
-        frames_reader, delay = (VideoReader(args.input), 1) if img is None else (ImageReader(args.input), 0)
+        frames_reader, delay = (VideoReader(args.input, camera_width, camera_height), 1) if img is None else (ImageReader(args.input), 0)
     else:
         raise ValueError('--input has to be set')
     
@@ -239,6 +271,7 @@ def run_demo(args):
         if res:
             detectframecount += 1
             imdraw = overlay_on_image(color_image, res, model_width, model_height, main_person, args.modality)
+            elaborate_pose(res)
             
         else:
             imdraw = color_image

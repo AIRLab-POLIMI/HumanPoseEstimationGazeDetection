@@ -27,7 +27,7 @@ def preprocess_bbox(bbox, image):
     return center, scale
 
 
-def extract_keypoints(heatmap, min_confidence=0.5):
+def extract_keypoints(heatmap, min_confidence=0.75):
     ind = np.unravel_index(np.argmax(heatmap, axis=None), heatmap.shape)
     if heatmap[ind] < min_confidence:
         ind = (-1, -1)
