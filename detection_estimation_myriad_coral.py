@@ -1,29 +1,21 @@
 #!/usr/bin/env python3
 
 import argparse
-import os
 import sys
 import cv2
 import time
 import numpy as np
-from PIL import Image
 import csv
 
 from edgetpu.basic import edgetpu_utils
 from pose_engine import PoseEngine
-from imutils.video.pivideostream import PiVideoStream
-from imutils.video.filevideostream import FileVideoStream
-import imutils
+
 
 from openvino.inference_engine import IECore
 
 from detector import Detector
-from estimator import HumanPoseEstimator
 
-from picamera.array import PiRGBArray
-from picamera import PiCamera
 import logging
-import sys
 
 logging.basicConfig(format="[ %(levelname)s ] %(message)s",
                     level=logging.INFO,
@@ -189,7 +181,6 @@ def overlay_on_image(frames, result, model_width, model_height,person,mode):
     return img_cp
 
 def run_demo(args):
-    detectfps = ""
     framecount = 0
     detectframecount = 0
     estimation_fps = ""
@@ -248,9 +239,7 @@ def run_demo(args):
         raise ValueError('--input has to be set')
     
     csv_out = open('data_out.csv', mode='w')
-    time_stamps = open('timestamps.csv', mode='w')
     writer_data = csv.writer(csv_out, dialect='excel')
-    writer_ts = csv.writer(time_stamps, dialect='excel')
     
     for frame in frames_reader:
         
@@ -279,11 +268,6 @@ def run_demo(args):
         print(score_detected)
         print("\n")
 
-        colors = [(0, 0, 255),
-                  (255, 0, 0), (0, 255, 0), (255, 0, 0), (0, 255, 0),
-                  (255, 0, 0), (0, 255, 0), (255, 0, 0), (0, 255, 0),
-                  (255, 0, 0), (0, 255, 0), (255, 0, 0), (0, 255, 0),
-                  (255, 0, 0), (0, 255, 0), (255, 0, 0), (0, 255, 0)]
         if res:
             detectframecount += 1
             imdraw = overlay_on_image(color_image, res, model_width, model_height, main_person, args.modality)
