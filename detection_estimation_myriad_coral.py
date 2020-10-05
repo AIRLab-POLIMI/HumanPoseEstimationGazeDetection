@@ -240,7 +240,7 @@ def run_demo(args):
     
     csv_out = open('data_out.csv', mode='w')
     writer_data = csv.writer(csv_out, dialect='excel')
-    writer_data.writerow(["timestamps","head points"])
+    writer_data.writerow(["timestamps","nose x", "nose y", "left eye x", "left eye y", "right eye x", "right eye y", "left ear x", "left ear y", "rigth ear x", "right ear y"])
     
     for frame in frames_reader:
         
@@ -274,7 +274,7 @@ def run_demo(args):
             imdraw = overlay_on_image(color_image, res, model_width, model_height, main_person, args.modality)
             head, ts = elaborate_pose(res)
             print(type(head))
-            writer_data.writerow([ts, head])
+            writer_data.writerow([ts, head[0,0], head[0,1], head[1,0], head[1,1], head[2,0], head[2,1], head[3,0], head[3,1], head[4,0], head[4,1]])
             
         else:
             imdraw = color_image
