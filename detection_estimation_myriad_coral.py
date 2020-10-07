@@ -113,6 +113,7 @@ def elaborate_pose(result, threshold=0.7):  #the order of the first keypoints is
     i=0
     print("<------------POSE DATA------------->")
     xys = {}
+    score = {}
     for pose in result:
        i+=1
        for label, keypoint in pose.keypoints.items(): 
@@ -120,21 +121,31 @@ def elaborate_pose(result, threshold=0.7):  #the order of the first keypoints is
                if (label == "nose" or label == "left eye" or label == "right eye" \
                     or label == "left ear" or label == "right ear") and keypoint.score > threshold:
                     xys[label] = (int(keypoint.yx[1]), int(keypoint.yx[0]))
-               else: xys[label] = (-1,-1)
-    head = np.zeros((5,2))
+                    score[label] = keypoint.score
+               else:
+                   xys[label] = (0,0)
+                   score[label] = 0
+    head = np.zeros((5,2)).astype(np.int)
+    #Head and scores must be ordered like [nose, reye, leye, rear, lear]
     head[0][0] = xys["nose"][0]
     head[0][1] = xys["nose"][1]
-    head[1][0] = xys["left eye"][0]
-    head[1][1] = xys["left eye"][1]
-    head[2][0] = xys["right eye"][0]
-    head[2][1] = xys["right eye"][1]
-    head[3][0] = xys["left ear"][0]
-    head[3][1] = xys["left ear"][1]
-    head[4][0] = xys["right ear"][0]
-    head[4][1] = xys["right ear"][1]
+    head[1][0] = xys["right eye"][0]
+    head[1][1] = xys["right eye"][1]
+    head[2][0] = xys["left eye"][0]
+    head[2][1] = xys["left eye"][1]
+    head[3][0] = xys["right ear"][0]
+    head[3][1] = xys["right ear"][1]
+    head[4][0] = xys["left ear"][0]
+    head[4][1] = xys["left ear"][1]
+    scores = np.zeros((5,1))
+    scores[0] = score["nose"]
+    scores[1] = score["right eye"]
+    scores[2] = score["left eye"]    
+    scores[3] = score["right ear"]
+    scores[4] = score["left ear"]
+    
     ts = time.time()
-    return head, ts
-    print(head)
+    return head, ts, scores
         
 def draw_pose(img, pose, person, mode, i, threshold=0.7):
     xys = {}
@@ -238,9 +249,9 @@ def run_demo(args):
     else:
         raise ValueError('--input has to be set')
     
-    csv_out = open('data_out.csv', mode='w')
-    writer_data = csv.writer(csv_out, dialect='excel')
-    writer_data.writerow(["timestamps","nose x", "nose y", "left eye x", "left eye y", "right eye x", "right eye y", "left ear x", "left ear y", "rigth ear x", "right ear y"])
+    #csv_out = open('data_out.csv', mode='w')
+    #writer_data = csv.writer(csv_out, dialect='excel')
+    #writer_data.writerow(["timestamps","nose x", "nose y", "left eye x", "left eye y", "right eye x", "right eye y", "left ear x", "left ear y", "rigth ear x", "right ear y"])
     
     for frame in frames_reader:
         
@@ -272,9 +283,9 @@ def run_demo(args):
         if res:
             detectframecount += 1
             imdraw = overlay_on_image(color_image, res, model_width, model_height, main_person, args.modality)
-            head, ts = elaborate_pose(res)
-            print(type(head))
-            writer_data.writerow([ts, head[0,0], head[0,1], head[1,0], head[1,1], head[2,0], head[2,1], head[3,0], head[3,1], head[4,0], head[4,1]])
+            head, ts, scores_head = elaborate_pose(res)
+            print(scores_head)
+            #writer_data.writerow([ts, head[0,0], head[0,1], head[1,0], head[1,1], head[2,0], head[2,1], head[3,0], head[3,1], head[4,0], head[4,1]])
             
         else:
             imdraw = color_image
