@@ -5,6 +5,7 @@ import sys
 import cv2
 import time
 import numpy as np
+import math
 
 from edgetpu.basic import edgetpu_utils
 from pose_engine import PoseEngine
@@ -117,21 +118,21 @@ def draw_on_img(img, centr, res, uncertainty): #gaze drawing
     #result = cv2.circle(img, (int(point[0]),int(point[1])), 5, (0,0,255), 2)
     result = cv2.arrowedLine(img, (int(centr[0]),int(centr[1])), (int(point[0]),int(point[1])), (0,0,0), thickness=3, tipLength=0.2)
     result = cv2.arrowedLine(result, (int(centr[0]),int(centr[1])), (int(point[0]),int(point[1])), (0,0,255), thickness=2, tipLength=0.2)
-    result = cv2.putText(result, " Gaze Uncertainty {:.3f}".format(uncertainty), (10,310), cv2.FONT_HERSHEY_SIMPLEX ,0.5, (0,255,0),1)
+    result = cv2.putText(result, " Gaze Uncertainty {:.3f}".format(uncertainty), (10,450), cv2.FONT_HERSHEY_SIMPLEX ,0.5, (0,255,0),1)
     return result
 
-def elaborate_gaze(img, head, score):
+def elaborate_gaze(img, head, score, model_gaze):
     centroid = compute_centroid(head)
     max_dist = max([dist_2D(j, centroid) for j in head])
     new_repr= np.array(head) - np.array(centroid)
     result= []
     for point in head:
-    if point[0] != 0:
-        new_repr = np.array(point) - np.array(centroid)
-        result.append([new_repr[0]/max_dist, new_repr[1]/max_dist])
-    else: result.append([0,0])
+        if point[0] != 0:
+            new_repr = np.array(point) - np.array(centroid)
+            result.append([new_repr[0]/max_dist, new_repr[1]/max_dist])
+        else: result.append([0,0])
+        
     features = [item for sublist in result for item in sublist]
-    print(features)
     featMap = np.asarray(features)
     confMap = np.asarray(score)
     featMap = np.reshape(featMap,(1,10))
@@ -147,14 +148,15 @@ def elaborate_gaze(img, head, score):
     pred_ = model_gaze.predict(X_, batch_size=32, verbose=0)
     gazeDirections = pred_[0,:-1]
     Uncertainties = np.exp(pred_[0,-1])
-    Centroids = ld[0,0:2]   
+    Centroids = ld[0,0:2]
+    print("Centroid")
+    print(Centroids)
     result = draw_on_img(img, Centroids, gazeDirections, Uncertainties)
 
     return result
       
 def elaborate_pose(result, threshold=0.7):  #the order of the first keypoints is given in pose_engine.py (var list KEYPOINTS)
     i=0
-    print("<------------POSE DATA------------->")
     xys = {}
     score = {}
     for pose in result:
@@ -169,7 +171,7 @@ def elaborate_pose(result, threshold=0.7):  #the order of the first keypoints is
                    xys[label] = (0,0)
                    score[label] = 0
     head = np.zeros((5,2)).astype(np.int)
-    #Head and scores must be ordered like [nose, reye, leye, rear, lear]
+    #Head and scores must be ordered like [nose, reye, leye, rear, lear] for the gaze model
     head[0][0] = xys["nose"][0]
     head[0][1] = xys["nose"][1]
     head[1][0] = xys["right eye"][0]
@@ -236,8 +238,12 @@ def overlay_on_image(frames, result, model_width, model_height,person,mode):
 
 def compute_centroid(points):
 
-    mean_x = np.mean([p[0] for p in points])
-    mean_y = np.mean([p[1] for p in points])
+    mean_x = np.mean([p[0] for p in points if p[0]!=0])
+    mean_y = np.mean([p[1] for p in points if p[0]!=0])
+    
+    if math.isnan(mean_x) or math.isnan(mean_x):
+        mean_x=0;
+        mean_y=0;
 
     return [mean_x, mean_y]
 
@@ -307,7 +313,7 @@ def run_demo(args):
     print(detector_person.__dict__)
 
     model_gaze = prepare_modelSingle('relu')
-    model_gaze.load_weights('model/trainedOnGazeFollow_weights.h5')
+    model_gaze.load_weights('/home/pi/Detection-and-Human-Pose-Estimation---RASPBERRY/trainedOnGazeFollow_weights.h5')
         
     if args.input != '':
         img = cv2.imread(args.input[0], cv2.IMREAD_COLOR)
@@ -333,7 +339,7 @@ def run_demo(args):
         if areas:
             box_person_num = areas.index(max(areas))
             main_person = [bboxes_person[box_person_num][0],bboxes_person[box_person_num][1],bboxes_person[box_person_num][2],bboxes_person[box_person_num][3]]
-            print(main_person)
+            #print(main_person)
             
         color_image = frame
         color_image = cv2.resize(color_image, (model_width, model_height))
@@ -350,7 +356,9 @@ def run_demo(args):
             detectframecount += 1
             imdraw = overlay_on_image(color_image, res, model_width, model_height, main_person, args.modality)
             head, scores_head = elaborate_pose(res)
-            imdraw = elaborate_gaze(imdraw, head, scores_head)
+            print("Head")
+            print(head)
+            imdraw = elaborate_gaze(imdraw, head, scores_head, model_gaze)
             #writer_data.writerow([ts, head[0,0], head[0,1], head[1,0], head[1,1], head[2,0], head[2,1], head[3,0], head[3,1], head[4,0], head[4,1]])
             
         else:
