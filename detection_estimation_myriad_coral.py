@@ -108,7 +108,7 @@ class VideoReader(object):
 def draw_on_img(img, centr, res, uncertainty): #gaze drawing
     res[0] *= img.shape[0]
     res[1] *= img.shape[1]
-    angle = math.degrees(math.atan2(res[0],res[1]))
+    angle = -math.degrees(math.atan2(res[1],res[0]))
 
     norm1 = res / np.linalg.norm(res)
     norm1[0] *= img.shape[0]*0.10
@@ -116,7 +116,6 @@ def draw_on_img(img, centr, res, uncertainty): #gaze drawing
     
     point = centr + norm1 
 
-    #result = cv2.circle(img, (int(point[0]),int(point[1])), 5, (0,0,255), 2)
     result = cv2.arrowedLine(img, (int(centr[0]),int(centr[1])), (int(point[0]),int(point[1])), (0,0,0), thickness=3, tipLength=0.2)
     result = cv2.arrowedLine(result, (int(centr[0]),int(centr[1])), (int(point[0]),int(point[1])), (0,0,255), thickness=2, tipLength=0.2)
     result = cv2.putText(result, " Gaze Uncertainty {:.3f}".format(uncertainty), (10,450), cv2.FONT_HERSHEY_SIMPLEX ,0.5, (0,255,0),1)    
@@ -151,13 +150,11 @@ def elaborate_gaze(img, head, score, model_gaze):
     gazeDirections = pred_[0,:-1]
     Uncertainties = np.exp(pred_[0,-1])
     Centroids = ld[0,0:2]
-    #print("Centroid")
-    #print(Centroids)
-    if args.no_show==False:
+    if args.no_show:
+        return pred_
+    else:
         result = draw_on_img(img, Centroids, gazeDirections, Uncertainties)
         return result
-    else:
-        return pred_
     
       
 def elaborate_pose(result, threshold=0.7):  #the order of the first keypoints is given in pose_engine.py (var list KEYPOINTS)
@@ -176,6 +173,7 @@ def elaborate_pose(result, threshold=0.7):  #the order of the first keypoints is
                    xys[label] = (0,0)
                    score[label] = 0
     head = np.zeros((5,2)).astype(np.int)
+    
     #Head and scores must be ordered like [nose, reye, leye, rear, lear] for the gaze model
     head[0][0] = xys["nose"][0]
     head[0][1] = xys["nose"][1]
@@ -254,9 +252,6 @@ def compute_centroid(points):
 
 def dist_2D(p1, p2):
 
-    # print(p1)
-    # print(p2)
-
     p1 = np.array(p1)
     p2 = np.array(p2)
 
@@ -266,13 +261,7 @@ def dist_2D(p1, p2):
 
 
 def run_demo(args):
-    framecount = 0
-    detectframecount = 0
-    estimation_fps = ""
-    detection_fps = ""
-    fps = ""
-    time1 = 0
-    time2 = 0
+    
 
     if args.model_hpe == "models/posenet_mobilenet_v1_075_481_641_quant_decoder_edgetpu.tflite":
         camera_width  = 640
@@ -303,32 +292,39 @@ def run_demo(args):
                 break
         file1.close()
             
-    
+    # Posenet - Google Coral Inference
+    print("#----- Loading Posenet - Coral Inference -----#")
     devices = edgetpu_utils.ListEdgeTpuPaths(edgetpu_utils.EDGE_TPU_STATE_UNASSIGNED)
     engine = PoseEngine(args.model_hpe, devices[0])
+    print("#-----Done-----#")
     
-    log.info("Device info:")
-    print("{}{}".format(" "*8, args.device))
+    #Mobilenet - NCS2 Inference
+    print("#-----Loading Mobilenet - NCS2 Inference -----#")
     ie = IECore()
-    detector_person = Detector(ie, path_to_model_xml=args.model_od,
-                              device=args.device,
-                              label_class=args.person_label)
+    detector_person = Detector(ie, path_to_model_xml=args.model_od, device=args.device, label_class=args.person_label)
+    print("#-----Done-----#")
     
-    print("DETECTOR  = ")
-    print(detector_person.__dict__)
 
+    #Custom Gaze Estimator predictor
+    print("#-----Loading Gaze Estimator Net -----#")    
     model_gaze = prepare_modelSingle('relu')
-    model_gaze.load_weights('/home/pi/Detection-and-Human-Pose-Estimation---RASPBERRY/trainedOnGazeFollow_weights.h5')
+    model_gaze.load_weights('/home/pi/Detection-and-Human-Pose-Estimation---RASPBERRY/trainedOnGazeFollow_weights.h5')    
+    print("#-----Done-----#")
         
     if args.input != '':
         img = cv2.imread(args.input[0], cv2.IMREAD_COLOR)
         frames_reader, delay = (VideoReader(args.input, camera_width, camera_height), 1) if img is None else (ImageReader(args.input), 0)
     else:
         raise ValueError('--input has to be set')
-    
-    #csv_out = open('data_out.csv', mode='w')
-    #writer_data = csv.writer(csv_out, dialect='excel')
-    #writer_data.writerow(["timestamps","nose x", "nose y", "left eye x", "left eye y", "right eye x", "right eye y", "left ear x", "left ear y", "rigth ear x", "right ear y"])
+        
+    framecount = 0
+    detectframecount = 0
+    estimation_fps = ""
+    detection_fps = ""
+    fps = ""
+    time1 = 0
+    time2 = 0
+    imdraw = []
     
     for frame in frames_reader:
         
@@ -337,12 +333,6 @@ def run_demo(args):
         # Run Object Detection
         bboxes, labels_detected, score_detected, bboxes_person = detector_person.detect(frame)
         
-        print("LABELS DETECTED")
-        print(labels_detected)
-        print("SCORE DETECTED")
-        print(score_detected)
-        print("\n")
-
         main_person = [0,0,0,0]
         areas=[]
         for bbox in bboxes_person:
@@ -351,9 +341,8 @@ def run_demo(args):
         if areas:
             box_person_num = areas.index(max(areas))
             main_person = [bboxes_person[box_person_num][0],bboxes_person[box_person_num][1],bboxes_person[box_person_num][2],bboxes_person[box_person_num][3]]
-            #print(main_person)
-        
-        # Run Pose Estimation
+            
+        # Run Pose + Gaze Estimation
         color_image = frame
         color_image = cv2.resize(color_image, (model_width, model_height))
         prepimg = color_image[:, :, ::-1].copy()         
@@ -362,18 +351,20 @@ def run_demo(args):
         if res:
             detectframecount += 1            
             head, scores_head = elaborate_pose(res)
-            if args.no_show == False:
+            
+            if args.no_show:
+                prediction = elaborate_gaze(imdraw, head, scores_head, model_gaze)
+            else:
                 imdraw = overlay_on_image(color_image, res, model_width, model_height, main_person, args.modality)
                 imdraw = elaborate_gaze(imdraw, head, scores_head, model_gaze)
-            else:
-                prediction = elaborate_gaze(imdraw, head, scores_head, model_gaze)
                 
         else:
             imdraw = color_image
         
         i=0
     
-            
+        
+        # FPS Calculation
         framecount += 1
         if framecount >= 15:
             fps       = "Overall: {:.1f} FPS, ".format(float(time1/15))
@@ -391,9 +382,9 @@ def run_demo(args):
 
         if args.no_show:
             print(display_fps)
-            #print(prediction)
             continue 
         
+        #Visualization
         for bbox in bboxes:
             cv2.rectangle(imdraw, (bbox[0], bbox[1]), (bbox[0] + bbox[2], bbox[1] + bbox[3]), (0, 0, 255), 1)
             if len(labels_detected)>0:

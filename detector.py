@@ -14,11 +14,7 @@ class Detector(object):
     def __init__(self, ie, path_to_model_xml, device, label_class, scale=None, thr=0.60):
         self.OUTPUT_SIZE = 7
         self.CHANNELS_SIZE = 3
-        log.info('DETECTOR - Loading IR to the plugin...')
         self.model = ie.read_network(path_to_model_xml, os.path.splitext(path_to_model_xml)[0] + '.bin')
-        
-        #self.model = ie.load_network(network=self.net, device_name=device, num_requests=2)
-        log.info('DETECTOR - Net loaded')
 
         assert len(self.model.input_info) == 1, "Expected 1 input blob"
 
