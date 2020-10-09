@@ -47,7 +47,7 @@ EDGES = (
 
 def build_argparser():
     parser = argparse.ArgumentParser()
-    parser.add_argument("-m_od", "--model_od", type=str, default= "mobilenet-ssd.xml",
+    parser.add_argument("-m_od", "--model_od", type=str, default= "ssdlite_mobilenet_v2/FP16/ssdlite_mobilenet_v2.xml",
                         help="path to model of object detector to be infered in NCS2, in xml format")
 
     parser.add_argument("-m_hpe", "--model_hpe", default="models/posenet_mobilenet_v1_075_481_641_quant_decoder_edgetpu.tflite", type=str,
@@ -108,17 +108,19 @@ class VideoReader(object):
 def draw_on_img(img, centr, res, uncertainty): #gaze drawing
     res[0] *= img.shape[0]
     res[1] *= img.shape[1]
+    angle = math.degrees(math.atan2(res[0],res[1]))
 
     norm1 = res / np.linalg.norm(res)
-    norm1[0] *= img.shape[0]*0.15
-    norm1[1] *= img.shape[0]*0.15
+    norm1[0] *= img.shape[0]*0.10
+    norm1[1] *= img.shape[0]*0.10
     
     point = centr + norm1 
 
     #result = cv2.circle(img, (int(point[0]),int(point[1])), 5, (0,0,255), 2)
     result = cv2.arrowedLine(img, (int(centr[0]),int(centr[1])), (int(point[0]),int(point[1])), (0,0,0), thickness=3, tipLength=0.2)
     result = cv2.arrowedLine(result, (int(centr[0]),int(centr[1])), (int(point[0]),int(point[1])), (0,0,255), thickness=2, tipLength=0.2)
-    result = cv2.putText(result, " Gaze Uncertainty {:.3f}".format(uncertainty), (10,450), cv2.FONT_HERSHEY_SIMPLEX ,0.5, (0,255,0),1)
+    result = cv2.putText(result, " Gaze Uncertainty {:.3f}".format(uncertainty), (10,450), cv2.FONT_HERSHEY_SIMPLEX ,0.5, (0,255,0),1)    
+    result = cv2.putText(result, " Gaze Angle {:.3f}".format(angle), (10,470), cv2.FONT_HERSHEY_SIMPLEX ,0.5, (0,255,0),1)
     return result
 
 def elaborate_gaze(img, head, score, model_gaze):
@@ -149,11 +151,14 @@ def elaborate_gaze(img, head, score, model_gaze):
     gazeDirections = pred_[0,:-1]
     Uncertainties = np.exp(pred_[0,-1])
     Centroids = ld[0,0:2]
-    print("Centroid")
-    print(Centroids)
-    result = draw_on_img(img, Centroids, gazeDirections, Uncertainties)
-
-    return result
+    #print("Centroid")
+    #print(Centroids)
+    if args.no_show==False:
+        result = draw_on_img(img, Centroids, gazeDirections, Uncertainties)
+        return result
+    else:
+        return pred_
+    
       
 def elaborate_pose(result, threshold=0.7):  #the order of the first keypoints is given in pose_engine.py (var list KEYPOINTS)
     i=0
@@ -329,8 +334,15 @@ def run_demo(args):
         
         t1 = time.perf_counter()
 
-        # Run inference.
+        # Run Object Detection
         bboxes, labels_detected, score_detected, bboxes_person = detector_person.detect(frame)
+        
+        print("LABELS DETECTED")
+        print(labels_detected)
+        print("SCORE DETECTED")
+        print(score_detected)
+        print("\n")
+
         main_person = [0,0,0,0]
         areas=[]
         for bbox in bboxes_person:
@@ -340,37 +352,27 @@ def run_demo(args):
             box_person_num = areas.index(max(areas))
             main_person = [bboxes_person[box_person_num][0],bboxes_person[box_person_num][1],bboxes_person[box_person_num][2],bboxes_person[box_person_num][3]]
             #print(main_person)
-            
+        
+        # Run Pose Estimation
         color_image = frame
         color_image = cv2.resize(color_image, (model_width, model_height))
         prepimg = color_image[:, :, ::-1].copy()         
         res, inference_time = engine.DetectPosesInImage(prepimg)
-          
-        print("LABELS DETECTED")
-        print(labels_detected)
-        print("SCORE DETECTED")
-        print(score_detected)
-        print("\n")
-
+        
         if res:
-            detectframecount += 1
-            imdraw = overlay_on_image(color_image, res, model_width, model_height, main_person, args.modality)
+            detectframecount += 1            
             head, scores_head = elaborate_pose(res)
-            print("Head")
-            print(head)
-            imdraw = elaborate_gaze(imdraw, head, scores_head, model_gaze)
-            #writer_data.writerow([ts, head[0,0], head[0,1], head[1,0], head[1,1], head[2,0], head[2,1], head[3,0], head[3,1], head[4,0], head[4,1]])
-            
+            if args.no_show == False:
+                imdraw = overlay_on_image(color_image, res, model_width, model_height, main_person, args.modality)
+                imdraw = elaborate_gaze(imdraw, head, scores_head, model_gaze)
+            else:
+                prediction = elaborate_gaze(imdraw, head, scores_head, model_gaze)
+                
         else:
             imdraw = color_image
         
         i=0
-        for bbox in bboxes:
-            cv2.rectangle(imdraw, (bbox[0], bbox[1]), (bbox[0] + bbox[2], bbox[1] + bbox[3]), (0, 0, 255), 1)
-            #cv2.putText(imdraw, labels[args.person_label], (bbox[0]+3,bbox[1]-7), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255,255,255))
-            if len(labels_detected)>0:
-                cv2.putText(imdraw, labels[labels_detected[i].astype(int)], (bbox[0]+3,bbox[1]-7), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255,255,255))
-                i+=1
+    
             
         framecount += 1
         if framecount >= 15:
@@ -387,12 +389,18 @@ def run_demo(args):
         detection_fps = "Detection: {:.1f} FPS".format(float(1/detector_person.infer_time))
         display_fps = fps + estimation_fps + detection_fps
 
-        cv2.putText(imdraw, display_fps, (5,20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255,255,255), 1)
-
         if args.no_show:
             print(display_fps)
-            continue
-            
+            #print(prediction)
+            continue 
+        
+        for bbox in bboxes:
+            cv2.rectangle(imdraw, (bbox[0], bbox[1]), (bbox[0] + bbox[2], bbox[1] + bbox[3]), (0, 0, 255), 1)
+            if len(labels_detected)>0:
+                cv2.putText(imdraw, labels[labels_detected[i].astype(int)], (bbox[0]+3,bbox[1]-7), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255,255,255))
+        i+=1
+        
+        cv2.putText(imdraw, display_fps, (5,20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255,255,255), 1)
         cv2.imshow('Demo', imdraw)
         key = cv2.waitKey(delay)
         if key == 27:
