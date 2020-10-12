@@ -6,22 +6,21 @@ import cv2
 import time
 import numpy as np
 import math
+from threading import Thread
 
 from edgetpu.basic import edgetpu_utils
 from pose_engine import PoseEngine
 from finalmodel import prepare_modelSingle
-
 from openvino.inference_engine import IECore
-
 from detector import Detector
 
-import logging
+import socket
 
+import logging
 logging.basicConfig(format="[ %(levelname)s ] %(message)s",
                     level=logging.INFO,
                     stream=sys.stdout)
 log = logging.getLogger()
-
 
 EDGES = (
     ('nose', 'left eye'),
@@ -59,51 +58,43 @@ def build_argparser():
     parser.add_argument("--person_label", type=int, required=False, default=1, help="Label of class person for detector")
     parser.add_argument("--modality", type=str, default="Multi", help="Define the modality of representation of the output. Set single to visualize the skeleton of the main actor")
     parser.add_argument("--no_show", help='Optional. Do not display output.', action='store_true')
-    
     return parser
 
-class ImageReader(object):
-    def __init__(self, file_names):
-        self.file_names = file_names
-        self.max_idx = len(file_names)
 
-    def __iter__(self):
-        self.idx = 0
-        return self
-
-    def __next__(self):
-        if self.idx == self.max_idx:
-            raise StopIteration
-        img = cv2.imread(self.file_names[self.idx], cv2.IMREAD_COLOR)
-        if img.size == 0:
-            raise IOError('Image {} cannot be read'.format(self.file_names[self.idx]))
-        self.idx += 1
-        return img
-
-
-class VideoReader(object):
-    def __init__(self, file_name, width, height):
-        try:
-            self.file_name = int(file_name[0])
-        except:
-            self.file_name = file_name[0]
+class WebcamVideoStream:
+    def __init__(self, width, height,src=0):
         self.width = width
         self.height = height
-
-
-    def __iter__(self):
-        self.cap = cv2.VideoCapture(self.file_name)
-        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.width)
-        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.height)
-        if not self.cap.isOpened():
-            raise IOError('Video {} cannot be opened'.format(self.file_name))
+        #initialize the video stream and read the first frame
+        self.stream = cv2.VideoCapture(src)
+        self.stream.set(cv2.CAP_PROP_FRAME_WIDTH, self.width)
+        self.stream.set(cv2.CAP_PROP_FRAME_WIDTH, self.height)
+        (self.grabbed, self.frame) = self.stream.read()
+        
+        #inizializing the variable used to indicate if the thread shoud be stopped
+        self.stopped = False
+            
+    def start(self):
+        #start the thread to read frames from the video stream
+        Thread(target=self.update, args=()).start()
         return self
+    
+    def update(self):
+        #keep looping until the thread is stopped
+        while True:
+            #if the thread indicator variable is set, stop the thread. Otherwise read the next frame
+            if self.stopped: return
+            else: (self.grabbed, self.frame) = self.stream.read()
+        
+    def read(self):
+        #return the most recent frame
+        return self.frame
+    
+    def stop(self):
+        #stop the thread
+        self.stopped = True
 
-    def __next__(self):
-        was_read, img = self.cap.read()
-        if not was_read:
-            raise StopIteration
-        return img
+        
 
 def draw_on_img(img, centr, res, uncertainty): #gaze drawing
     res[0] *= img.shape[0]
@@ -154,9 +145,8 @@ def elaborate_gaze(img, head, score, model_gaze):
         return pred_
     else:
         result = draw_on_img(img, Centroids, gazeDirections, Uncertainties)
-        return result
+        return result, pred_
     
-      
 def elaborate_pose(result, threshold=0.7):  #the order of the first keypoints is given in pose_engine.py (var list KEYPOINTS)
     i=0
     xys = {}
@@ -222,7 +212,6 @@ def draw_pose(img, pose, person, mode, i, threshold=0.7):
                 img = cv2.line(img, (ax, ay), (bx, by), (255,0,0), 2)
         else:
             img = cv2.line(img, (ax, ay), (bx, by), (255,0,0), 2)
-
 
 def overlay_on_image(frames, result, model_width, model_height,person,mode):
 
@@ -311,12 +300,6 @@ def run_demo(args):
     model_gaze.load_weights('/home/pi/Detection-and-Human-Pose-Estimation---RASPBERRY/trainedOnGazeFollow_weights.h5')    
     print("#-----Done-----#")
         
-    if args.input != '':
-        img = cv2.imread(args.input[0], cv2.IMREAD_COLOR)
-        frames_reader, delay = (VideoReader(args.input, camera_width, camera_height), 1) if img is None else (ImageReader(args.input), 0)
-    else:
-        raise ValueError('--input has to be set')
-        
     framecount = 0
     detectframecount = 0
     estimation_fps = ""
@@ -326,8 +309,38 @@ def run_demo(args):
     time2 = 0
     imdraw = []
     
-    for frame in frames_reader:
+    #Camera Thread
+    vs = WebcamVideoStream(camera_width, camera_height, src=0).start()
+    
+    while True:
         
+        child_state = ""
+        key = cv2.waitKey(1)            
+        if key == 27:
+            break
+        
+        if key == ord('1'):
+            child_state = "touch"
+            print("State = "+child_state)
+        elif key == ord('2'):
+            child_state = "push"
+            print("State = "+child_state)
+        elif key == ord('3'):
+            child_state = "hit"
+            print("State = "+child_state)
+        elif key == ord('4'):
+            child_state = "hug"
+            print("State = "+child_state)
+        elif key == ord('5'):
+            child_state = "strongHug"
+            print("State = "+child_state)
+        elif key == ord('6'):
+            child_state = "none"
+            print("State = "+child_state)
+            
+        
+        
+        frame = vs.read()
         t1 = time.perf_counter()
 
         # Run Object Detection
@@ -356,14 +369,12 @@ def run_demo(args):
                 prediction = elaborate_gaze(imdraw, head, scores_head, model_gaze)
             else:
                 imdraw = overlay_on_image(color_image, res, model_width, model_height, main_person, args.modality)
-                imdraw = elaborate_gaze(imdraw, head, scores_head, model_gaze)
+                imdraw, prediction = elaborate_gaze(imdraw, head, scores_head, model_gaze)
                 
         else:
             imdraw = color_image
-        
+                
         i=0
-    
-        
         # FPS Calculation
         framecount += 1
         if framecount >= 15:
@@ -393,9 +404,9 @@ def run_demo(args):
         
         cv2.putText(imdraw, display_fps, (5,20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255,255,255), 1)
         cv2.imshow('Demo', imdraw)
-        key = cv2.waitKey(delay)
-        if key == 27:
-            break
+        
+            
+    vs.stop()
 
 if __name__ == "__main__":
     args = build_argparser().parse_args()
