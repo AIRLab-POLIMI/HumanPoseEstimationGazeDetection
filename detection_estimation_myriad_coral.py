@@ -46,7 +46,7 @@ EDGES = (
 
 def build_argparser():
     parser = argparse.ArgumentParser()
-    parser.add_argument("-m_od", "--model_od", type=str, default= "ssdlite_mobilenet_v2/FP16/ssdlite_mobilenet_v2.xml",
+    parser.add_argument("-m_od", "--model_od", type=str, default= "models/ssdlite_mobilenet_v2/FP16/ssdlite_mobilenet_v2.xml",
                         help="path to model of object detector to be infered in NCS2, in xml format")
 
     parser.add_argument("-m_hpe", "--model_hpe", default="models/posenet_mobilenet_v1_075_481_641_quant_decoder_edgetpu.tflite", type=str,
@@ -265,11 +265,11 @@ def run_demo(args):
     model_width   = 640
     model_height  = 480
     
-    if args.model_od == "mobilenet-ssd.xml":
+    if args.model_od == "models/mobilenet-ssd.xml":
         labels = ['Background','Person','Car', 'Bus', 'Bicycle','Motorcycle'] #???
-    elif args.model_od == "ssdlite_mobilenet_v2/FP16/ssdlite_mobilenet_v2.xml" or "ssdlite_mobilenet_v2/FP32/ssdlite_mobilenet_v2.xml" :
+    elif args.model_od == "models/ssdlite_mobilenet_v2/FP16/ssdlite_mobilenet_v2.xml" or "models/ssdlite_mobilenet_v2/FP32/ssdlite_mobilenet_v2.xml" :
         labels = [" ",]
-        file1 = open("labels.txt", 'r')
+        file1 = open("models/ssdlite_mobilenet_v2/labels.txt", 'r')
         while True:
             line = file1.readline().rstrip().split()
             if len(line) == 1: line = " "
