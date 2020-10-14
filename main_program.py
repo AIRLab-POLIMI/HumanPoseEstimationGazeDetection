@@ -250,6 +250,15 @@ def dist_2D(p1, p2):
 
     squared_dist = np.sum((p1 - p2)**2, axis=0)
     return np.sqrt(squared_dist)
+    
+def human_camera_angle(person, im_width):
+    xmin = person[0]
+    xmax = person[0] + person[2]
+    left = xmin*im_width
+    right = xmax*im_width
+    centerx = left + ((right-left)/2)
+    angle = (0.09375*centerx)-22.5
+    return angle
 
 
 def run_demo(args):
@@ -322,6 +331,7 @@ def run_demo(args):
     Finding_human = False #am i looking for a human?
     actual_action = " "
     action_sound = "none"
+    child_action = "none"
     
     interaction = 0
     cont_int = 0
@@ -385,6 +395,9 @@ def run_demo(args):
         if areas:
             box_person_num = areas.index(max(areas))
             main_person = [bboxes_person[box_person_num][0],bboxes_person[box_person_num][1],bboxes_person[box_person_num][2],bboxes_person[box_person_num][3]]
+            angle = human_camera_angle(main_person, camera_width)
+        else:
+            angle = 0
             
         # Run Pose + Gaze Estimation
         color_image = frame
@@ -419,13 +432,16 @@ def run_demo(args):
             #interaction = 2 is when the robot is already interacting with the human
                         
             if interaction != 2 : #If I'm not interacting with the human
-            arduino.previous_action = "none"
+                print("Interaction != 2, I'm not interacting with the human")
+                arduino.previous_action = "none"
                 if arduino.old_user != "none": #if an object is detected by the sonar, check if it is a human
-                    angle = human_camera_angle() ############### --- I NEED TO EXTRACT THE ANGLE OF THE PERSON --- #############
+                    print("Object detected by sonars")
                     if angle != 0:  # this can be replaced with a check if it is human, so this translate to if there is a human 
+                        print("Human detected in the FOV")
                         count = 4
                         tracking_a_user = functions_main.human_verification(angle, arduino.old_user, count) #it check if obstacle from sonar is a human
                         if tracking_a_user == True:
+                            print("Object from sonar is a human")
                             interaction = 1
                             ### --- I Should check if the path between the robot and the child is clear
                             ##if the human is free
@@ -435,49 +451,60 @@ def run_demo(args):
                             action_sound = "excited"
                             Finding_human = False
                         else: #if it find an object that is not a human, must rotate until that obstacle is an human
+                            print("Object from sonar is not a human")
                             cont_int = 0
                             if angle >=0:
+                                print("Searching right...")
                                 functions_main.send_uno_lights(arduino.ser1, "none")
                                 functions_main.send_initial_action_arduino("rotateRight", arduino.ser, "none")
                             else:
+                                print("Searching left...")
                                 functions_main.send_uno_lights(arduino.ser1, "none")
                                 functions_main.send_initial_action_arduino("rotateLeft", arduino.ser, "none")
                     else : #if there is no human
+                        print("No human in the FOV, searching")
                         functions_main.send_uno_lights(arduino.ser1, "rotate")
                         functions_main.send_initial_action_arduino("rotate", arduino.ser, "found")
                         action_sound = "found"
                         #should reproduce sound?
                 else : #if there is no object detected by the sonar
+                    print("No object close")
                     cont_int = 0
-                    angle = human_camera_angle() ### check for human
                     if angle != 0: #there is a human in the FOV of robot
+                        print("No object, but human in the FOV")
                         interaction = 1
-                        if (abs(angle)<15): #the human is in front of the robot
+                        if (abs(angle)<7.5): #the human is in front of the robot
+                            print("Approaching the human")
                             functions_main.send_uno_lights(arduino.ser1, "move")
                             functions_main.send_initial_action_arduino("move", arduino.ser, "move")
                             action_sound = "move"
                             #reproduce sound??
                         else:
                             if angle >=0:
+                                print("Searching right...")
                                 functions_main.send_uno_lights(arduino.ser1, "none")
                                 functions_main.send_initial_action_arduino("rotateRight", arduino.ser, "none")
                             else:
+                                print("Searching left...")
                                 functions_main.send_uno_lights(arduino.ser1, "none")
                                 functions_main.send_initial_action_arduino("rotateLeft", arduino.ser, "none")
                     else: #if there is no human
                         functions_main.send_uno_lights(arduino.ser1, "rotate")
                         functions_main.send_initial_action_arduino("rotate", arduino.ser, "found")
                         action_sound = "found"
+                        print("No human in the FOV, searching")
                         #should reproduce sound?
-                        
             else: # interaction = 2, so i'm starting the interaction loop
+                print("INTERACTION LOOP")
                 if arduino.old_user == "none" and arduino.previous_old_user=="none": #I've lost the interaction with the human
+                    print("INTERACTION LOOP - I've lost contact with the human")
                     time_out_system = 0
                     Finding_human = True # Am i looking for a human?
                     start_time_out_system = time.time()
                     time_out_system_hum = 0
                     count_find = 0
-                elif arduino.old_user != "none" and time_out_system<TIME_OUT):
+                elif arduino.old_user != "none" and time_out_system<TIME_OUT:
+                    print("INTERACTION LOOP - Preparing the interaction")
                     #if i'm still interacting with the child and inside the timeout time
                     if Finding_human == False: #if i was not looking for a human
                         current_time_out_system_hum = time.time()
@@ -488,7 +515,8 @@ def run_demo(args):
                             Finding_human = True
                         else:
                             time_out_system = 0
-                            if arduino.new_dist > 150.0: #if the distance to the chld is bigger than 1.5m, get closer
+                            if arduino.new_dist > 150.0: #if the distance to the chld is bigger than , get closer
+                                print("INTERACTION LOOP - Approaching the child")
                                 if arduino.old_user != "front" :
                                     if arduino.old_user == "right":
                                         functions_main.send_uno_lights(arduino.ser1, "none")
@@ -500,15 +528,19 @@ def run_demo(args):
                                     functions_main.send_uno_lights(arduino.ser1, "move")
                                     functions_main.send_initial_action_arduino("move", arduino.ser, "move_find")
                             else: #if it's closer than 1.5m perform the interaction loop normally and select action of the child (child_action)
+                                print("INTERACTION LOOP - Correctly interacting")
                                 functions_main.decide_action(child_action, arduino.user_movement) #decide robot behaviour based on action of the child and movement of the robot
                                 functions_main.send_uno_lights(arduino.ser1, functions_main.current_action)
                                 functions_main.send_initial_action_arduino( functions_main.current_action, arduino.ser, functions_main.current_action)
+                                print(child_action + functions_main.current_action)
                     else: #i need to find the human
-                        angle = human_camera_angle() ############### --- I NEED TO EXTRACT THE ANGLE OF THE PERSON --- #############
+                        print("INTERACTION LOOP - Looking for a human")
                         if angle != 0:  # this can be replaced with a check if it is human, so this translate to if there is a human 
+                            print("INTERACTION LOOP - Human detecte in the FOV")
                             count = 4
                             tracking_a_user = functions_main.human_verification(angle, arduino.old_user, count) #it check if obstacle from sonar is a human
                             if tracking_a_user == True:
+                                print("INTERACTION LOOP - Object from sonar is a human")
                                 interaction = 1
                                 ### --- I Should check if the path between the robot and the child is clear
                                 ##if the human is free
@@ -518,15 +550,19 @@ def run_demo(args):
                                 action_sound = "excited"
                                 Finding_human = False
                             else: #if it find an object that is not a human, must rotate until that obstacle is an human
+                                print("INTERACTION LOOP - Object from sonar is not a human")
                                 cont_int = 0
                                 if angle >=0:
+                                    print("INTERACTION LOOP - Searching right...")
                                     functions_main.send_uno_lights(arduino.ser1, "none")
                                     functions_main.send_initial_action_arduino("rotateRight", arduino.ser, "none")
                                 else:
+                                    print("INTERACTION LOOP - Searching left...")
                                     functions_main.send_uno_lights(arduino.ser1, "none")
                                     functions_main.send_initial_action_arduino("rotateLeft", arduino.ser, "none")
                                 start_time_out_system = time.time()
                         else: #if there is no human
+                            print("INTERACTION LOOP - No human in the FOV, searching")
                             current_time_out_system = time.time()
                             time_out_system = time_out_system + (current_time_out_system - start_time_out_system)
                             start_time_out_system = current_time_out_system
@@ -535,38 +571,45 @@ def run_demo(args):
                             action_sound = "found"
                             #should reproduce sound?
                 elif Finding_human == True and time_out_system < TIME_OUT : #if i need to find the child and i'm inside the timout
+                    print("INTERACTION LOOP - Looking for a human")
                     #I need to find the human
-                    angle = human_camera_angle() ############### --- I NEED TO EXTRACT THE ANGLE OF THE PERSON --- #############
-                        if angle != 0:  # this can be replaced with a check if it is human, so this translate to if there is a human 
-                            count = 4
-                            tracking_a_user = functions_main.human_verification(angle, arduino.old_user, count) #it check if obstacle from sonar is a human
-                            if tracking_a_user == True:
-                                interaction = 1
-                                ### --- I Should check if the path between the robot and the child is clear
-                                ##if the human is free
-                                ##if the human is free for few instant
-                                interaction = 2
-                                start_time_out_system_hum = time.time()
-                                action_sound = "excited"
-                                Finding_human = False
-                            else: #if it find an object that is not a human, must rotate until that obstacle is an human
-                                cont_int = 0
-                                if angle >=0:
-                                    functions_main.send_uno_lights(arduino.ser1, "none")
-                                    functions_main.send_initial_action_arduino("rotateRight", arduino.ser, "none")
-                                else:
-                                    functions_main.send_uno_lights(arduino.ser1, "none")
-                                    functions_main.send_initial_action_arduino("rotateLeft", arduino.ser, "none")
-                                start_time_out_system = time.time()
-                        else: #if there is no human
-                            current_time_out_system = time.time()
-                            time_out_system = time_out_system + (current_time_out_system - start_time_out_system)
-                            start_time_out_system = current_time_out_system
-                            functions_main.send_uno_lights(arduino.ser1, "rotate")
-                            functions_main.send_initial_action_arduino("rotate", arduino.ser, "found")
-                            action_sound = "found"
-                            #should reproduce sound?
+                    if angle != 0:  # this can be replaced with a check if it is human, so this translate to if there is a human
+                        print("INTERACTION LOOP - Human detecte in the FOV")
+                        count = 4
+                        tracking_a_user = functions_main.human_verification(angle, arduino.old_user, count) #it check if obstacle from sonar is a human
+                        if tracking_a_user == True:
+                            print("INTERACTION LOOP - Object from sonar is a human")
+                            interaction = 1
+                            ### --- I Should check if the path between the robot and the child is clear
+                            ##if the human is free
+                            ##if the human is free for few instant
+                            interaction = 2
+                            start_time_out_system_hum = time.time()
+                            action_sound = "excited"
+                            Finding_human = False
+                        else: #if it find an object that is not a human, must rotate until that obstacle is an human
+                            print("INTERACTION LOOP - Object from sonar is not a human")
+                            cont_int = 0
+                            if angle >=0:
+                                print("INTERACTION LOOP - Searching right...")
+                                functions_main.send_uno_lights(arduino.ser1, "none")
+                                functions_main.send_initial_action_arduino("rotateRight", arduino.ser, "none")
+                            else:
+                                print("INTERACTION LOOP - Searching left...")
+                                functions_main.send_uno_lights(arduino.ser1, "none")
+                                functions_main.send_initial_action_arduino("rotateLeft", arduino.ser, "none")
+                            start_time_out_system = time.time()
+                    else: #if there is no human
+                        print("INTERACTION LOOP - No human in the FOV, searching")
+                        current_time_out_system = time.time()
+                        time_out_system = time_out_system + (current_time_out_system - start_time_out_system)
+                        start_time_out_system = current_time_out_system
+                        functions_main.send_uno_lights(arduino.ser1, "rotate")
+                        functions_main.send_initial_action_arduino("rotate", arduino.ser, "found")
+                        action_sound = "found"
+                        #should reproduce sound?
                 elif Finding_human == True and time_out_system>TIME_OUT: #If 'm looking for the children and i run out of time
+                    print("Going out of the interaction loop")
                     current_time_out_system = 0
                     time_out_system = 0
                     start_time_out_system = 0
@@ -604,6 +647,7 @@ def run_demo(args):
         i+=1
         
         cv2.putText(imdraw, display_fps, (5,20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255,255,255), 1)
+        cv2.putText(imdraw, "Angle of person: {:.1f} ".format(angle), (5,40), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255,255,255), 1)
         cv2.imshow('Demo', imdraw)
         
             
