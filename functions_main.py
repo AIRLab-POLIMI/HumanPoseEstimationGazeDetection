@@ -11,10 +11,10 @@ def human_verification(angle_mean, user, count): #return if the object detected 
     if (( user== "front") and ((angle_mean >=-15 ) and (angle_mean <= 15)) and (count >=2)):
         print("Human front")
         tracking_a_user = True
-    elif (( user== "right") and (angle_mean >= 7.5) and (count >=2)):
+    elif (( user== "right") and (angle_mean >= 7) and (count >=2)):
         print("human right")
         tracking_a_user = True
-    elif ((user == "left") and (angle_mean <=-7.5) and (count >=2)):
+    elif ((user == "left") and (angle_mean <=-7) and (count >=2)):
         print("Human left")
         tracking_a_user = True
     else:
