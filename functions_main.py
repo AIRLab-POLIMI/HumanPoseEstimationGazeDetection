@@ -51,7 +51,7 @@ def send_initial_action_arduino(actual_action, ser,action):
         ser.write(bytes((actual_action+'\n'), encoding='utf-8'))
         
         # The system will not continue until the movement has been performed
-        #reproduce_action_sound(action)
+        reproduce_action_sound(action)
         line = ser.readline().decode('utf-8').rstrip()
         
         #reproduce_action_sound(actual_action)
