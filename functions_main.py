@@ -29,8 +29,8 @@ def send_action_arduino(actual_action, reply, ser, tracking_a_user):
         # If there is a user being tracked, send the message tu the arduino to perform the correspondent action
         ser.write(bytes((actual_action+'\n'), encoding='utf-8'))
         line = ser.readline().decode('utf-8').rstrip()
-        reproduce_action_sound(actual_action)
-        print(line)
+        #reproduce_action_sound(actual_action)
+        #print(line)
     elif(tracking_a_user == True):
         # it means that it is the same message as before, then, no new action will be sent
         actual_action = reply
@@ -51,11 +51,11 @@ def send_initial_action_arduino(actual_action, ser,action):
         ser.write(bytes((actual_action+'\n'), encoding='utf-8'))
         
         # The system will not continue until the movement has been performed
-        reproduce_action_sound(action)
+        #reproduce_action_sound(action)
         line = ser.readline().decode('utf-8').rstrip()
         
         #reproduce_action_sound(actual_action)
-        print(line)
+        #print(line)
 
 
 def reproduce_action_sound(action):
