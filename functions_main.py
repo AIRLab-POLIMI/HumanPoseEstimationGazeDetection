@@ -59,34 +59,35 @@ def send_initial_action_arduino(actual_action, ser,action):
 
 
 def reproduce_action_sound(action):
-    if(action!="none" and action!="scared" and action!="move_find"):
+    if(action!="none" and action!="move_find"):
         if(action == "excited"):
-            run("omxplayer --vol 600 /home/pi/tensorflow1/models/research/object_detection/sounds/Excited_R2D2.mp3",shell=True)
+            run("lxterminal -e omxplayer --vol 600 sounds/Excited_R2D2.mp3 &",shell=True)
         elif(action == "sad"):
-            run("omxplayer --vol 600 /home/pi/tensorflow1/models/research/object_detection/sounds/Sad_R2D2.mp3",shell=True)
+            run("lxterminal -e omxplayer --vol 600 sounds/Sad_R2D2.mp3 &",shell=True)
         elif(action == "out"):
-            run("omxplayer --vol 600 /home/pi/tensorflow1/models/research/object_detection/sounds/Playful_R2D2.mp3",shell=True)
+            run("lxterminal -e omxplayer --vol 600 sounds/Playful_R2D2.mp3 &",shell=True)
         elif(action == "found"):
-            run("omxplayer --vol 600 /home/pi/tensorflow1/models/research/object_detection/sounds/founding.mp3",shell=True)
+            run("lxterminal -e omxplayer --vol 600 sounds/founding.mp3 &",shell=True)
         elif(action == "move"):
-            run("omxplayer --vol 600 /home/pi/tensorflow1/models/research/object_detection/sounds/fordward.mp3",shell=True)
+            run("lxterminal -e omxplayer --vol 600 sounds/fordward.mp3 &",shell=True)
         elif(action == "excited_attract"):
-            run("omxplayer --vol 600 /home/pi/tensorflow1/models/research/object_detection/sounds/Excited_R2D2.mp3",shell=True)
+            run("lxterminal -e omxplayer --vol 600 sounds/Excited_R2D2.mp3 &",shell=True)
         elif(action == "interested_excited"):
-            run("omxplayer --vol 600 /home/pi/tensorflow1/models/research/object_detection/sounds/founding.mp3",shell=True)
+            run("lxterminal -e omxplayer --vol 600 sounds/founding.mp3 &",shell=True)
         elif(action == "happy"):
-            run("omxplayer --vol 600 /home/pi/tensorflow1/models/research/object_detection/sounds/Laughing_R2D2.mp3",shell=True)
+            run("lxterminal -e omxplayer --vol 600 sounds/Laughing_R2D2.mp3 &",shell=True)
         elif(action == "very_scared"):
-            run("omxplayer --vol 600 /home/pi/tensorflow1/models/research/object_detection/sounds/Screaming_R2D2.mp3",shell=True)
-        elif(action == "angry"  ):
-            run("omxplayer --vol 600 /home/pi/tensorflow1/models/research/object_detection/sounds/Snappy_R2D2.mp3",shell=True)
+            run("lxterminal -e omxplayer --vol 600 sounds/Screaming_R2D2.mp3 &",shell=True)
+        elif(action == "scared"):
+            run("lxterminal -e omxplayer --vol 600 sounds/Screaming_R2D3.mp3 &",shell=True)
+        elif(action == "angry"):
+            run("lxterminal -e omxplayer --vol 600 sounds/Snappy_R2D2.mp3 &",shell=True)
             
 def decide_action(action,movement):
     global previous_action
     global current_action
     global state_user
     state = state_user
-    previous_action = current_action
     obtain_user_state(action,movement)
     if(((state =="interested_scared" )and(previous_action == "interested_excited")) or ((state =="interested_scared" )and(previous_action == "happy")) or ((state =="interested_scared" )and(previous_action == "scared")) or ((state =="interested_scared" )and(previous_action == "very_scared")) or ((state =="interested_scared" )and(previous_action == "sad")) or ((state =="scared" )and(previous_action == "interested_excited")) or ((state =="scared" )and(previous_action == "happy")) or ((state =="scared" )and(previous_action == "angry")) or ((state =="scared" )and(previous_action == "sad")) or ((state =="scared" )and(previous_action == "none"))):
         current_action = "excited_attract"
@@ -101,13 +102,15 @@ def decide_action(action,movement):
     elif(((state =="scared_aggressive" )and(previous_action == "angry")) or ((state =="scared_aggressive" )and(previous_action == "sad")) or ((state =="gaming_aggressive" )and(previous_action == "sad"))):
         current_action = "sad"
     elif(((state =="scared_aggressive" )and(previous_action == "very_scared"))):
-        current_action = "angry"
+        current_action = "angry"    
+    previous_action = current_action
+
     
 def obtain_user_state(action,movement):
     global state_user
     if(((action == "touch")and(movement == "forward")) or ((action == "hug")and(movement == "forward")) or ((action == "none")and(movement == "forward")) or ((action == "hug")and(movement == "stopped"))):
         state_user = "interested_interacting"
-    elif (((action == "push")and(movement == "forward")) or ((action == "hit")and(movement == "forward")) or ((action == "push")and(movement == "stopped")) or ((action == "hit")and(movement == "stopped"))):
+    elif (((action == "push")and(movement == "forward")) or ((action == "hit")and(movement == "forward")) or ((action == "push")and(movement == "stopped")) or ((action == "hit")and(movement == "stopped")) or ((action == "hit")and(movement == "backward"))):
         state_user = "scared_aggressive"
     elif(((action == "touch")and(movement == "backward")) or ((action == "touch")and(movement == "stopped")) or ((action == "none")and(movement == "stopped"))):
         state_user = "interested_scared"

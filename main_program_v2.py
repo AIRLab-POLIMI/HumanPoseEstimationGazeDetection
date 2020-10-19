@@ -101,29 +101,37 @@ class WebcamVideoStream:
 def on_press(key):
     global child_action
     global JointAttention
+    global receiveAction
     try:
         print("{0} Pressed".format(key.char))        
         if key.char == ("a"):
             child_action = "touch"
             JointAttention = False
+            receiveAction = True
         elif key.char == ("s"):
             child_action = "push"
             JointAttention = False
+            receiveAction = True
         elif key.char == ("d"):
             child_action = "hit"
             JointAttention = False
+            receiveAction = True
         elif key.char == ("f"):
             child_action = "hug"
             JointAttention = False
+            receiveAction = True
         elif key.char == ("g"):
             child_action = "strongHug"
             JointAttention = False
+            receiveAction = True
         elif key.char == ("h"):
             child_action = "none"
             JointAttention = False
+            receiveAction = True
         elif key.char == ("j"):
             child_action = "joint"
             JointAttention = False
+            receiveAction = True
         else:
             child_action = child_action
     except AttributeError:
@@ -299,6 +307,7 @@ def human_camera_angle(person, im_width):
 
 child_action = "none"
 JointAttention = False
+receiveAction = False
 breakFromKey = False
 listener = keyboard.Listener(on_press = on_press, on_release = on_release)
 listener.start()
@@ -365,18 +374,22 @@ def run_demo(args):
     imdraw = []
     
     #Human Interaction variables
-    TIME_OUT = 20 #The robot have 20 sec to find the user if he/she is gone during the interaction
+    TIME_OUT = 60 #The robot have 20 sec to find the user if he/she is gone during the interaction
     TIME_OUT_HUM = 120 #every 120 sec i need to check if i'm dealing with a human
+    JA_TIME = 30 #duration of JA task analisys
     child_action_prec = "none"
     tracking_a_user = False #is the obstacle i read from sonar an human?
     Finding_human = False #am i looking for a human?
+    global receiveAction
     global JointAttention
+    firstTime = True
     actual_action = " "
     action_sound = "none"
     
     interaction = 0
     cont_int = 0
     action_count = 1
+    
     
     #--> Counting the time that manages the reseach of a human
     time_out_system = 0
@@ -388,6 +401,10 @@ def run_demo(args):
     start_time_out_system_hum = 0
     current_time_out_system_hum = 0
     
+    #---> Counting JA task observation
+    start_time_JA = 0
+    duration_JA = 0
+    actual_time_JA = 0
     count_find = 0
     
     #Camera Thread
@@ -584,15 +601,24 @@ def run_demo(args):
                                     angle = 0
                                 if angle != 0:
                                     print("INTERACTION LOOP - Correctly interacting")
-                                    if child_action != child_action_prec:
+                                    if firstTime:
+                                            functions_main.send_uno_lights(arduino.ser1,"happy")
+                                            functions_main.send_initial_action_arduino("happy", arduino.ser, "happy")
+                                            firstTime = False
+                                    if receiveAction:                                        
                                         if child_action != "joint":
                                             functions_main.decide_action(child_action, arduino.user_movement) #decide robot behaviour based on action of the child and movement of the robot
                                             functions_main.send_uno_lights(arduino.ser1, functions_main.current_action)
                                             functions_main.send_initial_action_arduino( functions_main.current_action, arduino.ser, functions_main.current_action)
                                             functions_main.send_uno_lights(arduino.ser1, "none")
+                                            receiveAction = False
                                         else:
                                             JointAttention = True
-                                    if JointAttention:
+                                            start_time_JA = time.time()
+                                            duration_JA = 0
+                                    if JointAttention and duration_JA < JA_TIME:
+                                        actual_time_JA = time.time()
+                                        duration_JA = duration_JA + (actual_time_JA - start_time_JA)
                                         print("Measuring Joint attention")
                                         functions_main.send_uno_lights(arduino.ser1, "happy")
                                         color_image = frame
@@ -600,10 +626,16 @@ def run_demo(args):
                                         prepimg = color_image[:, :, ::-1].copy() 
                                         res, inference_time = engine.DetectPosesInImage(prepimg)
                                         if res:
-                                            detectframecount += 1            
                                             head, scores_head = elaborate_pose(res)
                                             prediction = elaborate_gaze(imdraw, head, scores_head, model_gaze)
                                             print("Gaze versor: {}".format(prediction[0,:-1]))
+                                            print("Time: {}".format(duration_JA))
+                                    elif duration_JA >= JA_TIME:
+                                        functions_main.send_uno_lights(arduino.ser1, "happy")
+                                        functions_main.send_initial_action_arduino("excited", arduino.ser, "excited")
+                                        start_time_JA = 0
+                                        duration_JA = 0
+                                        actual_time_JA = 0
                                                     
                                     print("Child Action: " + child_action + " | " + "Robot Action: " + functions_main.current_action)
                                 else:
