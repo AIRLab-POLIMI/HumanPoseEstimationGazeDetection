@@ -13,6 +13,7 @@ from pose_engine import PoseEngine
 from finalmodel import prepare_modelSingle
 from openvino.inference_engine import IECore
 from detector import Detector
+from pynput import keyboard
 
 import functions_main
 import connections_arduinos as arduino #new_user_fun
@@ -60,7 +61,7 @@ def build_argparser():
                         help="Specify the target to infer on CPU, GPU, or MYRIAD")
     parser.add_argument("--person_label", type=int, required=False, default=1, help="Label of class person for detector")
     parser.add_argument("--modality", type=str, default="Multi", help="Define the modality of representation of the output. Set single to visualize the skeleton of the main actor")
-    parser.add_argument("--no_show", help='Optional. Do not display output.', action='store_true')
+    parser.add_argument("--no_show",required=True, help='Optional. Do not display output.', action='store_true')
     return parser
 
 
@@ -97,7 +98,52 @@ class WebcamVideoStream:
         #stop the thread
         self.stopped = True
 
+def on_press(key):
+    global child_action
+    global JointAttention
+    global receiveAction
+    try:
+        print("{0} Pressed".format(key.char))        
+        if key.char == ("a"):
+            child_action = "touch"
+            JointAttention = False
+            receiveAction = True
+        elif key.char == ("s"):
+            child_action = "push"
+            JointAttention = False
+            receiveAction = True
+        elif key.char == ("d"):
+            child_action = "hit"
+            JointAttention = False
+            receiveAction = True
+        elif key.char == ("f"):
+            child_action = "hug"
+            JointAttention = False
+            receiveAction = True
+        elif key.char == ("g"):
+            child_action = "strongHug"
+            JointAttention = False
+            receiveAction = True
+        elif key.char == ("h"):
+            child_action = "none"
+            JointAttention = False
+            receiveAction = True
+        elif key.char == ("j"):
+            child_action = "joint"
+            JointAttention = False
+            receiveAction = True
+        else:
+            child_action = child_action
+    except AttributeError:
+        child_action = child_action
+        print("Special Key {0} pressed".format(key))
 
+def on_release(key):
+    global child_action
+    global JointAttention
+    if key == keyboard.Key.esc:
+        child_action = "QUIT"          
+    print("Child action: " + child_action)
 
 def draw_on_img(img, centr, res, uncertainty): #gaze drawing
     res[0] *= img.shape[0]
@@ -259,8 +305,14 @@ def human_camera_angle(person, im_width):
     return angle
 
 
-def run_demo(args):
-    
+child_action = "none"
+JointAttention = False
+receiveAction = False
+breakFromKey = False
+listener = keyboard.Listener(on_press = on_press, on_release = on_release)
+listener.start()
+
+def run_demo(args):    
 
     if args.model_hpe == "models/posenet_mobilenet_v1_075_481_641_quant_decoder_edgetpu.tflite":
         camera_width  = 640
@@ -275,7 +327,7 @@ def run_demo(args):
     model_width   = 640
     model_height  = 480
     
-    #Loading labels based on the Object Detector model
+    #Loading labels based on the Object Detector model (different labels for different networks)
     if args.model_od == "models/mobilenet-ssd.xml":
         labels = ['Background','Person','Car', 'Bus', 'Bicycle','Motorcycle'] #???
     elif args.model_od == "models/ssdlite_mobilenet_v2/FP16/ssdlite_mobilenet_v2.xml" or "models/ssdlite_mobilenet_v2/FP32/ssdlite_mobilenet_v2.xml" :
@@ -322,18 +374,22 @@ def run_demo(args):
     imdraw = []
     
     #Human Interaction variables
-    TIME_OUT = 20 #The robot have 20 sec to find the user if he/she is gone during the interaction
+    TIME_OUT = 60 #The robot have 20 sec to find the user if he/she is gone during the interaction
     TIME_OUT_HUM = 120 #every 120 sec i need to check if i'm dealing with a human
-    
+    JA_TIME = 30 #duration of JA task analisys
+    child_action_prec = "none"
     tracking_a_user = False #is the obstacle i read from sonar an human?
     Finding_human = False #am i looking for a human?
+    global receiveAction
+    global JointAttention
+    firstTime = True
     actual_action = " "
     action_sound = "none"
-    child_action = "none"
     
     interaction = 0
     cont_int = 0
     action_count = 1
+    
     
     #--> Counting the time that manages the reseach of a human
     time_out_system = 0
@@ -345,86 +401,51 @@ def run_demo(args):
     start_time_out_system_hum = 0
     current_time_out_system_hum = 0
     
+    #---> Counting JA task observation
+    start_time_JA = 0
+    duration_JA = 0
+    actual_time_JA = 0
     count_find = 0
     
     #Camera Thread
     vs = WebcamVideoStream(camera_width, camera_height, src=0).start()
     
+    #Setting communications
     functions_main.send_uno_lights(arduino.ser1,"none")
     
     while True:
         
-        key = cv2.waitKey(1)            
-        if key == 27:
-            break
-        
-        if key == ord('1'):
-            child_action = "touch"
-            print("action = "+child_action)
-        elif key == ord('2'):
-            child_action = "push"
-            print("action = "+child_action)
-        elif key == ord('3'):
-            child_action = "hit"
-            print("action = "+child_action)
-        elif key == ord('4'):
-            child_action = "hug"
-            print("action = "+child_action)
-        elif key == ord('5'):
-            child_action = "strongHug"
-            print("action = "+child_action)
-        elif key == ord('6'):
-            child_action = "none"
-            print("action = "+child_action)
-            
-        
-        
         frame = vs.read()
+        arduino.new_user_function()
         t1 = time.perf_counter()
-
-        # Run Object Detection
-        bboxes, labels_detected, score_detected, bboxes_person = detector_person.detect(frame)
-        
-        main_person = [0,0,0,0]
-        areas=[]
-        for bbox in bboxes_person:
-            area = bbox[2]*bbox[3]
-            areas.append(area)
-        if areas:
-            box_person_num = areas.index(max(areas))
-            main_person = [bboxes_person[box_person_num][0],bboxes_person[box_person_num][1],bboxes_person[box_person_num][2],bboxes_person[box_person_num][3]]
-            angle = human_camera_angle(main_person, camera_width)
-        else:
-            angle = 0
             
         # Run Pose + Gaze Estimation
-        color_image = frame
-        color_image = cv2.resize(color_image, (model_width, model_height))
-        prepimg = color_image[:, :, ::-1].copy()         
-        res, inference_time = engine.DetectPosesInImage(prepimg)
+        #color_image = frame
+        #color_image = cv2.resize(color_image, (model_width, model_height))
+        #prepimg = color_image[:, :, ::-1].copy()         
+        #res, inference_time = engine.DetectPosesInImage(prepimg)
         
-        if res:
-            detectframecount += 1            
-            head, scores_head = elaborate_pose(res)
-            
-            if args.no_show:
-                prediction = elaborate_gaze(imdraw, head, scores_head, model_gaze)
-            else:
-                imdraw = overlay_on_image(color_image, res, model_width, model_height, main_person, args.modality)
-                imdraw, prediction = elaborate_gaze(imdraw, head, scores_head, model_gaze)
-                
-        else:
-            imdraw = color_image
+        #if res:
+        #    detectframecount += 1            
+        #    head, scores_head = elaborate_pose(res)
+        #    
+        #    if args.no_show:
+        #        prediction = elaborate_gaze(imdraw, head, scores_head, model_gaze)
+        #    else:
+        #        imdraw = overlay_on_image(color_image, res, model_width, model_height, main_person, args.modality)
+        #        imdraw, prediction = elaborate_gaze(imdraw, head, scores_head, model_gaze)
+        #        
+        #else:
+        #    imdraw = color_image
             
         ####-----START HUMAN INTERACTION-----####
-        
-        angle_tot = 0
-        angle_mean = 0
         count = 0
         
-        arduino.new_user_function() #Connect with the Mega and obtain data from sensors
+        #arduino.new_user_function() #Connect with the Mega and obtain data from sensors
+        
         if arduino.state_system == "busy":
             print("System is busy")
+            
         else:
             #interaction = 0 or interaction=1 is when the system is trying to estabilish an interaction with the child
             #interaction = 2 is when the robot is already interacting with the human
@@ -434,6 +455,22 @@ def run_demo(args):
                 arduino.previous_action = "none"
                 if arduino.old_user != "none": #if an object is detected by the sonar, check if it is a human
                     print("Object detected by sonars")
+                    
+                    # Run Object Detection
+                    
+                    bboxes, labels_detected, score_detected, bboxes_person = detector_person.detect(frame)
+                    main_person = [0,0,0,0]
+                    areas=[]
+                    for bbox in bboxes_person:
+                        area = bbox[2]*bbox[3]
+                        areas.append(area)
+                    if areas:
+                        box_person_num = areas.index(max(areas))
+                        main_person = [bboxes_person[box_person_num][0],bboxes_person[box_person_num][1],bboxes_person[box_person_num][2],bboxes_person[box_person_num][3]]
+                        angle = human_camera_angle(main_person, camera_width)
+                    else:
+                        angle = 0
+                        
                     if angle != 0:  # this can be replaced with a check if it is human, so this translate to if there is a human 
                         print("Human detected in the FOV")
                         count = 4
@@ -460,14 +497,31 @@ def run_demo(args):
                                 functions_main.send_uno_lights(arduino.ser1, "none")
                                 functions_main.send_initial_action_arduino("rotateLeft", arduino.ser, "none")
                     else : #if there is no human
-                        print("No human in the FOV, searching")
-                        functions_main.send_uno_lights(arduino.ser1, "rotate")
-                        functions_main.send_initial_action_arduino("rotate", arduino.ser, "found")
-                        action_sound = "found"
-                        #should reproduce sound?
+                        if arduino.old_user == "right":
+                            print("INTERACTION LOOP - Searching right...")
+                            functions_main.send_uno_lights(arduino.ser1, "none")
+                            functions_main.send_initial_action_arduino("rotateRight", arduino.ser, "none")
+                        else:
+                            print("INTERACTION LOOP - Searching left...")
+                            functions_main.send_uno_lights(arduino.ser1, "none")
+                            functions_main.send_initial_action_arduino("rotateLeft", arduino.ser, "none")
                 else : #if there is no object detected by the sonar
                     print("No object close")
                     cont_int = 0
+                    
+                    # Run Object Detection
+                    bboxes, labels_detected, score_detected, bboxes_person = detector_person.detect(frame)
+                    main_person = [0,0,0,0]
+                    areas=[]
+                    for bbox in bboxes_person:
+                        area = bbox[2]*bbox[3]
+                        areas.append(area)
+                    if areas:
+                        box_person_num = areas.index(max(areas))
+                        main_person = [bboxes_person[box_person_num][0],bboxes_person[box_person_num][1],bboxes_person[box_person_num][2],bboxes_person[box_person_num][3]]
+                        angle = human_camera_angle(main_person, camera_width)
+                    else:
+                        angle = 0
                     if angle != 0: #there is a human in the FOV of robot
                         print("No object, but human in the FOV")
                         interaction = 1
@@ -475,8 +529,6 @@ def run_demo(args):
                             print("Approaching the human")
                             functions_main.send_uno_lights(arduino.ser1, "move")
                             functions_main.send_initial_action_arduino("move", arduino.ser, "move")
-                            action_sound = "move"
-                            #reproduce sound??
                         else:
                             if angle >=0:
                                 print("Searching right...")
@@ -487,11 +539,14 @@ def run_demo(args):
                                 functions_main.send_uno_lights(arduino.ser1, "none")
                                 functions_main.send_initial_action_arduino("rotateLeft", arduino.ser, "none")
                     else: #if there is no human
-                        functions_main.send_uno_lights(arduino.ser1, "rotate")
-                        functions_main.send_initial_action_arduino("rotate", arduino.ser, "found")
-                        action_sound = "found"
-                        print("No human in the FOV, searching")
-                        #should reproduce sound?
+                        if arduino.old_user == "right":
+                            print("INTERACTION LOOP - Searching right...")
+                            functions_main.send_uno_lights(arduino.ser1, "none")
+                            functions_main.send_initial_action_arduino("rotateRight", arduino.ser, "none")
+                        else:
+                            print("INTERACTION LOOP - Searching left...")
+                            functions_main.send_uno_lights(arduino.ser1, "none")
+                            functions_main.send_initial_action_arduino("rotateLeft", arduino.ser, "none")
             else: # interaction = 2, so i'm starting the interaction loop
                 print("INTERACTION LOOP")
                 if arduino.old_user == "none" and arduino.previous_old_user=="none": #I've lost the interaction with the human
@@ -513,7 +568,8 @@ def run_demo(args):
                             Finding_human = True
                         else:
                             time_out_system = 0
-                            if arduino.new_dist > 150.0: #if the distance to the chld is bigger than , get closer
+                            print("Distance = {:.1f}".format(arduino.new_dist))
+                            if arduino.new_dist > 130.0: #if the distance to the chld is bigger than , get closer
                                 print("INTERACTION LOOP - Approaching the child")
                                 if arduino.old_user != "front" :
                                     if arduino.old_user == "right":
@@ -525,14 +581,85 @@ def run_demo(args):
                                 else: #if it's aligned, move forward
                                     functions_main.send_uno_lights(arduino.ser1, "move")
                                     functions_main.send_initial_action_arduino("move", arduino.ser, "move_find")
+                            elif arduino.new_dist < 20.0:
+                                print("INTERACTION LOOP - Too close")
+                                functions_main.send_uno_lights(arduino.ser1, "move")
+                                functions_main.send_initial_action_arduino("scared", arduino.ser, "move_find")
                             else: #if it's closer than 1.5m perform the interaction loop normally and select action of the child (child_action)
-                                print("INTERACTION LOOP - Correctly interacting")
-                                functions_main.decide_action(child_action, arduino.user_movement) #decide robot behaviour based on action of the child and movement of the robot
-                                functions_main.send_uno_lights(arduino.ser1, functions_main.current_action)
-                                functions_main.send_initial_action_arduino( functions_main.current_action, arduino.ser, functions_main.current_action)
-                                print(child_action + functions_main.current_action)
+                                # Run Object Detection
+                                bboxes, labels_detected, score_detected, bboxes_person = detector_person.detect(frame)
+                                main_person = [0,0,0,0]
+                                areas=[]
+                                for bbox in bboxes_person:
+                                    area = bbox[2]*bbox[3]
+                                    areas.append(area)
+                                if areas:
+                                    box_person_num = areas.index(max(areas))
+                                    main_person = [bboxes_person[box_person_num][0],bboxes_person[box_person_num][1],bboxes_person[box_person_num][2],bboxes_person[box_person_num][3]]
+                                    angle = human_camera_angle(main_person, camera_width)
+                                else:
+                                    angle = 0
+                                if angle != 0:
+                                    print("INTERACTION LOOP - Correctly interacting")
+                                    if firstTime:
+                                            functions_main.send_uno_lights(arduino.ser1,"happy")
+                                            functions_main.send_initial_action_arduino("happy", arduino.ser, "happy")
+                                            firstTime = False
+                                    if receiveAction:                                        
+                                        if child_action != "joint":
+                                            functions_main.decide_action(child_action, arduino.user_movement) #decide robot behaviour based on action of the child and movement of the robot
+                                            functions_main.send_uno_lights(arduino.ser1, functions_main.current_action)
+                                            functions_main.send_initial_action_arduino( functions_main.current_action, arduino.ser, functions_main.current_action)
+                                            functions_main.send_uno_lights(arduino.ser1, "none")
+                                            receiveAction = False
+                                        else:
+                                            JointAttention = True
+                                            start_time_JA = time.time()
+                                            duration_JA = 0
+                                    if JointAttention and duration_JA < JA_TIME:
+                                        actual_time_JA = time.time()
+                                        duration_JA = duration_JA + (actual_time_JA - start_time_JA)
+                                        print("Measuring Joint attention")
+                                        functions_main.send_uno_lights(arduino.ser1, "happy")
+                                        color_image = frame
+                                        color_image = cv2.resize(color_image, (model_width, model_height))
+                                        prepimg = color_image[:, :, ::-1].copy() 
+                                        res, inference_time = engine.DetectPosesInImage(prepimg)
+                                        if res:
+                                            head, scores_head = elaborate_pose(res)
+                                            prediction = elaborate_gaze(imdraw, head, scores_head, model_gaze)
+                                            print("Gaze versor: {}".format(prediction[0,:-1]))
+                                            print("Time: {}".format(duration_JA))
+                                    elif duration_JA >= JA_TIME:
+                                        functions_main.send_uno_lights(arduino.ser1, "happy")
+                                        functions_main.send_initial_action_arduino("excited", arduino.ser, "excited")
+                                        start_time_JA = 0
+                                        duration_JA = 0
+                                        actual_time_JA = 0
+                                                    
+                                    print("Child Action: " + child_action + " | " + "Robot Action: " + functions_main.current_action)
+                                else:
+                                    print("INTERACTION LOOP - I've lost contact with the human")
+                                    time_out_system = 0
+                                    Finding_human = True # Am i looking for a human?
+                                    start_time_out_system = time.time()
+                                    time_out_system_hum = 0
+                                    count_find = 0
                     else: #i need to find the human
                         print("INTERACTION LOOP - Looking for a human")
+                        # Run Object Detection
+                        bboxes, labels_detected, score_detected, bboxes_person = detector_person.detect(frame)
+                        main_person = [0,0,0,0]
+                        areas=[]
+                        for bbox in bboxes_person:
+                            area = bbox[2]*bbox[3]
+                            areas.append(area)
+                        if areas:
+                            box_person_num = areas.index(max(areas))
+                            main_person = [bboxes_person[box_person_num][0],bboxes_person[box_person_num][1],bboxes_person[box_person_num][2],bboxes_person[box_person_num][3]]
+                            angle = human_camera_angle(main_person, camera_width)
+                        else:
+                            angle = 0
                         if angle != 0:  # this can be replaced with a check if it is human, so this translate to if there is a human 
                             print("INTERACTION LOOP - Human detecte in the FOV")
                             count = 4
@@ -560,17 +687,33 @@ def run_demo(args):
                                     functions_main.send_initial_action_arduino("rotateLeft", arduino.ser, "none")
                                 start_time_out_system = time.time()
                         else: #if there is no human
-                            print("INTERACTION LOOP - No human in the FOV, searching")
                             current_time_out_system = time.time()
                             time_out_system = time_out_system + (current_time_out_system - start_time_out_system)
                             start_time_out_system = current_time_out_system
-                            functions_main.send_uno_lights(arduino.ser1, "rotate")
-                            functions_main.send_initial_action_arduino("rotate", arduino.ser, "found")
-                            action_sound = "found"
-                            #should reproduce sound?
+                            if arduino.old_user == "right":
+                                print("INTERACTION LOOP - Searching right...")
+                                functions_main.send_uno_lights(arduino.ser1, "none")
+                                functions_main.send_initial_action_arduino("rotateRight", arduino.ser, "none")
+                            else:
+                                print("INTERACTION LOOP - Searching left...")
+                                functions_main.send_uno_lights(arduino.ser1, "none")
+                                functions_main.send_initial_action_arduino("rotateLeft", arduino.ser, "none")
                 elif Finding_human == True and time_out_system < TIME_OUT : #if i need to find the child and i'm inside the timout
                     print("INTERACTION LOOP - Looking for a human")
                     #I need to find the human
+                    # Run Object Detection
+                    bboxes, labels_detected, score_detected, bboxes_person = detector_person.detect(frame)
+                    main_person = [0,0,0,0]
+                    areas=[]
+                    for bbox in bboxes_person:
+                        area = bbox[2]*bbox[3]
+                        areas.append(area)
+                    if areas:
+                        box_person_num = areas.index(max(areas))
+                        main_person = [bboxes_person[box_person_num][0],bboxes_person[box_person_num][1],bboxes_person[box_person_num][2],bboxes_person[box_person_num][3]]
+                        angle = human_camera_angle(main_person, camera_width)
+                    else:
+                        angle = 0
                     if angle != 0:  # this can be replaced with a check if it is human, so this translate to if there is a human
                         print("INTERACTION LOOP - Human detecte in the FOV")
                         count = 4
@@ -598,14 +741,17 @@ def run_demo(args):
                                 functions_main.send_initial_action_arduino("rotateLeft", arduino.ser, "none")
                             start_time_out_system = time.time()
                     else: #if there is no human
-                        print("INTERACTION LOOP - No human in the FOV, searching")
                         current_time_out_system = time.time()
                         time_out_system = time_out_system + (current_time_out_system - start_time_out_system)
                         start_time_out_system = current_time_out_system
-                        functions_main.send_uno_lights(arduino.ser1, "rotate")
-                        functions_main.send_initial_action_arduino("rotate", arduino.ser, "found")
-                        action_sound = "found"
-                        #should reproduce sound?
+                        if arduino.old_user == "right":
+                            print("INTERACTION LOOP - Searching right...")
+                            functions_main.send_uno_lights(arduino.ser1, "none")
+                            functions_main.send_initial_action_arduino("rotateRight", arduino.ser, "none")
+                        else:
+                            print("INTERACTION LOOP - Searching left...")
+                            functions_main.send_uno_lights(arduino.ser1, "none")
+                            functions_main.send_initial_action_arduino("rotateLeft", arduino.ser, "none")
                 elif Finding_human == True and time_out_system>TIME_OUT: #If 'm looking for the children and i run out of time
                     print("Going out of the interaction loop")
                     current_time_out_system = 0
@@ -615,26 +761,34 @@ def run_demo(args):
                     interaction = 0
                     
         ####-----END HUMAN INTERACTION----####
-                
+        
+        t2 = time.perf_counter()  
+        elapsedTime = t2-t1      
+        fps = 1/elapsedTime      
         i=0
         # FPS Calculation
-        framecount += 1
-        if framecount >= 15:
-            fps       = "Overall: {:.1f} FPS, ".format(float(time1/15))
-            estimation_fps = "Pose + Gaze Est.: {:.1f} FPS, ".format(float(detectframecount/time2))
-            framecount = 0
-            detectframecount = 0
-            time1 = 0
-            time2 = 0
-        t2 = time.perf_counter()
-        elapsedTime = t2-t1
-        time1 += 1/elapsedTime
-        time2 += elapsedTime
-        detection_fps = "Detection: {:.1f} FPS".format(float(1/detector_person.infer_time))
-        display_fps = fps + estimation_fps + detection_fps
+        #framecount += 1
+        #if framecount >= 15:
+        #    fps       = "Overall: {:.1f} FPS, ".format(float(time1/15))
+        #    estimation_fps = "Pose + Gaze Est.: {:.1f} FPS, ".format(float(detectframecount/time2))
+        #    framecount = 0
+        #    detectframecount = 0
+        #    time1 = 0
+        #    time2 = 0
+        #t2 = time.perf_counter()
+        #elapsedTime = t2-t1
+        #time1 += 1/elapsedTime
+        #time2 += elapsedTime
+        #detection_fps = "Detection: {:.1f} FPS".format(float(1/detector_person.infer_time))
+        #display_fps = fps + estimation_fps + detection_fps
 
+        child_action_prec = child_action
+        
+        if child_action == "QUIT":
+            break
+        
         if args.no_show:
-            print(display_fps)
+            print("Cicli al secondo: {:.1f} ".format(float(fps)))
             continue 
         
         #Visualization
@@ -648,7 +802,11 @@ def run_demo(args):
         cv2.putText(imdraw, "Angle of person: {:.1f} ".format(angle), (5,40), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255,255,255), 1)
         cv2.imshow('Demo', imdraw)
         
-            
+        
+        key = cv2.waitKey(1)            
+        if key == 27: #esc key
+            break
+        
     vs.stop()
 
 if __name__ == "__main__":
