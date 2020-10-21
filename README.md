@@ -10,7 +10,7 @@ Running the applications with the `-h` option yields the following usage message
 # detection_estimation_myriad_coral.py
 
 This is the debug script for visualization and extraction of information from all the models that are running simultaneously.
-It always make available the theorical istantaneous FPS for Object Detection and for Pose Estimation + Gaze Estimation
+It always makes available the theorical istantaneous FPS for Object Detection and for Pose Estimation + Gaze Estimation
 
 ```
 usage: detect_estimation_myriad_coral.py [-h] [-m_od MODEL_OD]
