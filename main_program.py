@@ -96,7 +96,7 @@ class WebcamVideoStream:
     def stop(self):
         #stop the thread
         self.stopped = True
-
+        
 def on_press(key):
     global child_action
     global JointAttention
@@ -483,7 +483,7 @@ def run_demo(args):
                     else : #if there is no human
                         print("Searching ...")
                         functions_main.send_uno_lights(arduino.ser1, "none")
-                        functions_main.send_initial_action_arduino("rotate", arduino.ser, "none")
+                        functions_main.send_initial_action_arduino("rotateRight", arduino.ser, "none")
                     print("No object close")
                     
                 else:    
@@ -518,9 +518,9 @@ def run_demo(args):
                             functions_main.send_uno_lights(arduino.ser1, "none")
                             functions_main.send_initial_action_arduino("rotateLeft", arduino.ser, "none")
                     else: #if there is no human
-                        print("INTERACTION LOOP - Searching")
+                        print("Searching")
                         functions_main.send_uno_lights(arduino.ser1, "none")
-                        functions_main.send_initial_action_arduino("rotate", arduino.ser, "none")
+                        functions_main.send_initial_action_arduino("rotateRight", arduino.ser, "none")
                         
             else: # interaction = 2, so i'm starting the interaction loop
                 print("INTERACTION LOOP")
@@ -581,6 +581,8 @@ def run_demo(args):
                             tooCloseCount = 0
                     else: #if it's closer than 1.5m perform the interaction loop normally and select action of the child (child_action)
                         # Run Object Detection. I start now the timer for human time out because else comprehend 20 < dist 130 AND dist = Max dist, so no object sensed by the sonar
+                        tooCloseCount = 0
+                        tooFarCount = 0
                         current_time_out_system_hum = time.time()
                         time_out_system_hum = time_out_system_hum+(current_time_out_system_hum-start_time_out_system_hum)
                         start_time_out_system_hum = current_time_out_system_hum
@@ -677,7 +679,7 @@ def run_demo(args):
                         functions_main.send_initial_action_arduino(lookTo, arduino.ser, "none")
                 elif Finding_human == True and time_out_system>TIME_OUT: #If 'm looking for the children and i run out of time
                     print("Terminating the program")
-                    child_action = "quit"
+                    child_action = "QUIT"
                     
         ####-----END HUMAN INTERACTION----####
         
