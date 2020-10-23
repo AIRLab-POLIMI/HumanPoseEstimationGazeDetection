@@ -91,56 +91,32 @@ def new_user_function():
         is_new_user = False
         previous_old_user = old_user
         #print("line: "+line)
-        for letter in line:  
-            #print (letter)
-            if (ord(letter) >= 32):
-                if ((user_obtained == False) and (ord(letter) == 32) ):
-                    user_obtained= True
-                    start_position = True
-                elif((user_obtained == False) and (ord(letter) !=32)and (ord(letter) != 70)):
-                    user.append(letter)
-                elif ((start_position==True)  and (ord(letter) !=32)):
-                    position.append(letter)
-                elif((start_position==True) and (ord(letter) == 32)):
-                    start_position = False
-                    start_distance = True
-                elif((start_distance ==True) and (ord(letter) !=32)):
-                    distance.append(letter)
-                elif((start_distance ==True) and (ord(letter) == 32)):
-                    start_distance = False
-                    start_movement = True
-                elif((start_movement ==True) and (ord(letter) !=32)):
-                    movement.append(letter)
+        
+        data = line.split()
+        if len(data) == 4:
+            new_user = data[0]
+            pos_tot = data[1]
+            new_dist = float(data[2])
+            user_movement = data[3]
             
-        new_user = ''.join(user)
-        pos_tot = ''.join(position)
-        dist_string = ''.join(distance)
-        user_movement = ''.join(movement)
-        #print("user: "+new_user)
-        #print("pos: " +pos_tot)
-        #print("dist: "+ dist_string)
-        new_dist = float(dist_string)
-        print(user_movement)
-        #print(pos_tot)
-        
-        #print("is new user? " + new_user)
-        if (new_user == "new"):
-            is_new_user = True
-        
-        if (pos_tot == "0"):
-            old_user = "left"
-            #print("left")
-        elif(pos_tot == "1"):
-            old_user = "right"
-            #print("right")
-        elif(pos_tot == "2"):
-            old_user = "front"
-            #print("front")
-        else:
-            old_user = "none"
-            print("none")
-        print("user pos: " + old_user)
-                
+            #print("is new user? " + new_user)
+            if (new_user == "new"):
+                is_new_user = True
+            
+            if (pos_tot == "0"):
+                old_user = "left"
+                #print("left")
+            elif(pos_tot == "1"):
+                old_user = "right"
+                #print("right")
+            elif(pos_tot == "2"):
+                old_user = "front"
+                #print("front")
+            else:
+                old_user = "none"
+                print("none")
+            print("user pos: " + old_user)
+                    
     
     
     
