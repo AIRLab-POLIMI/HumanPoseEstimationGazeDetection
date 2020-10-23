@@ -18,7 +18,6 @@ from pynput import keyboard
 import functions_main
 import connections_arduinos as arduino #new_user_fun
 
-import socket
 
 import logging
 logging.basicConfig(format="[ %(levelname)s ] %(message)s",
@@ -230,7 +229,6 @@ def elaborate_pose(result, threshold=0.7):  #the order of the first keypoints is
     scores[2] = score["left eye"]    
     scores[3] = score["right ear"]
     scores[4] = score["left ear"]
-    ts = time.time()
 
     return head, scores
         
@@ -371,14 +369,7 @@ def run_demo(args):
     print("#-----Done-----#")
     
     #Framerate variables
-    framecount = 0
-    detectframecount = 0
-    estimation_fps = ""
-    detection_fps = ""
     fps = ""
-    time1 = 0
-    time2 = 0
-    imdraw = []
     
     #Human Interaction variables
     TIME_OUT = 40 # How much time do i have if i'm searching a human during the interaction loop?
@@ -391,8 +382,6 @@ def run_demo(args):
     global JointAttention
     global child_action
     firstTime = True
-    actual_action = " "
-    action_sound = "none"
     lookTo = ""
     previousAngle = 0
     angle = 0
@@ -541,7 +530,6 @@ def run_demo(args):
                     time_out_system = 0 
                     start_time_out_system = time.time()
                     time_out_system_hum = 0
-                    count_find = 0
                 elif time_out_system_hum <= TIME_OUT_HUM and time_out_system<TIME_OUT and Finding_human == False: 
                     print("INTERACTION LOOP - Preparing the interaction")
                     #If there is a human interacting and i'm inside the timeout
@@ -697,8 +685,6 @@ def run_demo(args):
         elapsedTime = t2-t1      
         fps = 1/elapsedTime      
         i=0
-
-        child_action_prec = child_action
         
         if child_action == "QUIT":
             break
@@ -706,22 +692,6 @@ def run_demo(args):
         if args.no_show:
             print("Cicli al secondo: {:.1f} ".format(float(fps)))
             continue 
-        
-        #Visualization
-        for bbox in bboxes:
-            cv2.rectangle(imdraw, (bbox[0], bbox[1]), (bbox[0] + bbox[2], bbox[1] + bbox[3]), (0, 0, 255), 1)
-            if len(labels_detected)>0:
-                cv2.putText(imdraw, labels[labels_detected[i].astype(int)], (bbox[0]+3,bbox[1]-7), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255,255,255))
-        i+=1
-        
-        cv2.putText(imdraw, display_fps, (5,20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255,255,255), 1)
-        cv2.putText(imdraw, "Angle of person: {:.1f} ".format(angle), (5,40), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255,255,255), 1)
-        cv2.imshow('Demo', imdraw)
-        
-        
-        key = cv2.waitKey(1)            
-        if key == 27: #esc key
-            break
         
     vs.stop()
 

@@ -7,6 +7,7 @@
  * ***************************************************************************************************************
  * Last Update: 23/06/2020                                                                                       *
  * **************************************************************************************************************/
+
 void sonarSetup() {// this one is just 
   Serial.begin(115200);
   pingTimer[0] = millis() + 75; // First ping start in 75 ms in order to provide time to the system to start
@@ -19,7 +20,7 @@ void sonarSetup() {// this one is just
 //reads information from sensors
 void sonarLoop() {
   for (uint8_t i = 0; i < SONAR_NUM; i++) {
-    if (millis() >= pingTimer[i]) {
+    if (millis() >= pingTimer[i]) { 
       pingTimer[i] += PING_INTERVAL * SONAR_NUM;
       if (i == 0 && currentSensor == SONAR_NUM - 1)
         //oneSensorCycle(); // Do something with results.
