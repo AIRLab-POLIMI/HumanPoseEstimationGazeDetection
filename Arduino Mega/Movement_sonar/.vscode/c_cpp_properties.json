@@ -1,0 +1,23 @@
+{
+    "configurations": [
+        {
+            "name": "Win32",
+            "includePath": [
+                "C:\\Program Files (x86)\\Arduino\\tools\\**",
+                "C:\\Program Files (x86)\\Arduino\\hardware\\arduino\\avr\\**",
+                "C:\\Users\\Dario\\OneDrive - Politecnico di Milano\\Documenti\\Arduino\\libraries",
+                "C:/Users/Dario/OneDrive - Politecnico di Milano/Documenti/Arduino/libraries/ViRHas",
+                "C:/Users/Dario/OneDrive - Politecnico di Milano/Documenti/Arduino/libraries/Cytron_Motor_Drivers_Library",
+                "C:/Users/Dario/OneDrive - Politecnico di Milano/Documenti/Arduino/libraries/Encoder"
+            ],
+            "forcedInclude": [
+                "C:\\Program Files (x86)\\Arduino\\hardware\\arduino\\avr\\cores\\arduino\\Arduino.h"
+            ],
+            "intelliSenseMode": "msvc-x64",
+            "compilerPath": "C:/Program Files (x86)/Microsoft Visual Studio/2019/Community/VC/Tools/MSVC/14.27.29110/bin/Hostx64/x64/cl.exe",
+            "cStandard": "c17",
+            "cppStandard": "c++17"
+        }
+    ],
+    "version": 4
+}
