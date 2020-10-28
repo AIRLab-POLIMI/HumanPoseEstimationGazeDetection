@@ -9,11 +9,20 @@
 #define SONAR_NUM 4 
 #define MAX_DISTANCE 300 // Max distance returned
 #define PING_INTERVAL 33 // ms between pings from each sensor
-#define BUFF_LEN 5 // Length of the buffer to clean the data
+#define BUFF_LEN 10 // Length of the buffer to clean the data
 
 unsigned long pingTimer[SONAR_NUM];
-unsigned int cm[SONAR_NUM]; //To store raw ping distances
-uint8_t currentSensor = 0; // Which sensor is active
+
+float dist[SONAR_NUM];// Final distance communicated {F, R, L, B}
+float cm[SONAR_NUM]; //To store filtered actual ping distance
+float cm_prec[SONAR_NUM]; //To store filtered previous ping distance
+float minDist = MAX_DISTANCE; //Support to calculate which sensor is working
+
+int minIndex;
+
+bool backObstacle = true;  // Is there something behind my back?
+
+String positionObject = "";
 
 const int trigPin = 32;
 const int echoPin = 30;
@@ -34,16 +43,7 @@ NewPing sonar[SONAR_NUM] = {
   NewPing(trigPin3, echoPin3, MAX_DISTANCE), //back sonar  
   };
 
-float rawFront[BUFF_LEN];
-float rawRight[BUFF_LEN];
-float rawLeft[BUFF_LEN];
-float rawBack[BUFF_LEN];
 
-bool searchingDist[SONAR_NUM] = {true, true, true, true}; // Auxiliary variable to store distaces
-
-float dist[SONAR_NUM] = {MAX_DISTANCE, MAX_DISTANCE, MAX_DISTANCE, MAX_DISTANCE}; // Final distance communicated {F, R, L, B}
-
-String positionSonar = "";
 
 //MOTORS 
 //input pins
@@ -102,19 +102,19 @@ ViRHaS virhas = ViRHaS(motor1, motor2, motor3, ENCODER[0], ENCODER[1], ENCODER[2
 motion_t motion;
 
 // in order to record the action that 
-String movement = "";
+String movement = " ";
+String data = " ";
 
+float actualPosX = 0;
+float actualPosY = 0;
+float actualPosTh = 0;
+
+bool start = true;
+bool moving = false;
 int count = 0;
 
 void setup() {
-  
-  for(uint8_t i = 0; i < BUFF_LEN; i++){
-    rawFront[i] = MAX_DISTANCE;
-    rawRight[i] = MAX_DISTANCE;
-    rawLeft[i] = MAX_DISTANCE;
-    rawBack[i] = MAX_DISTANCE;
-    }
-  
+
   virhas.setKpid(2.0, 0.6, 0.5);
   virhas.stop();
   sonarSetup();
@@ -126,66 +126,56 @@ void loop() {
   // Reading data from SONAR
   
   for(uint8_t i = 0; i < SONAR_NUM; i++){
-    if(millis() >= pingTimer[i]){
-      pingTimer[i] += PING_INTERVAL * SONAR_NUM;
-      sonar[currentSensor].timer_stop();
-      currentSensor = i;
-      sonar[currentSensor].ping_timer(echoCheck);  // I have cm[i] filled with information at this point
-      }
-    }
-    
-  for(uint8_t i = BUFF_LEN -1 ; i < 0; i--){    // I create the circular buffer
-    rawFront[i] = rawFront[i-1];
-    rawRight[i] = rawRight[i-1];
-    rawLeft[i] = rawLeft[i-1];
-    rawBack[i] = rawBack[i-1];    
-    }
-    
-  rawFront[0] = cm[0];
-  rawRight[0] = cm[1];
-  rawLeft[0] = cm[2];
-  rawBack[0] = cm[3];
-  
-  for(uint8_t i = 0; i < SONAR_NUM; i++) searchingDist[i] = true;
-  
-  for(uint8_t i = 0; i < BUFF_LEN; i++){ // I assign as a distance the last read != from MAX DISTANCE searching dist would remain true if all the vector raw is MAX_DISTANCE
-    if(rawFront[i] != MAX_DISTANCE && searchingDist[0]){
-      dist[0] = rawFront[i];
-      searchingDist[0] = false;  
-      }
-    if(rawRight[i] != MAX_DISTANCE && searchingDist[1]){
-      dist[1] = rawRight[i];
-      searchingDist[1] = false;
-      }
-    if(rawLeft[i] != MAX_DISTANCE && searchingDist[2]){
-      dist[2] = rawLeft[i];
-      searchingDist[2] = false;
-      }
-    if(rawBack[i] != MAX_DISTANCE && searchingDist[3]){
-      dist[3] = rawBack[i];
-      searchingDist[3] = false;
-      }
+    cm_prec[i] = cm[i];
     }
   
   for(uint8_t i = 0; i < SONAR_NUM; i++){
-    if(searchingDist[i]){
-      dist[i] = MAX_DISTANCE;
+    if(millis() >= pingTimer[i]){
+      pingTimer[i] += PING_INTERVAL * SONAR_NUM;
+      dist[i] = sonar[i].ping_median(BUFF_LEN);
+      cm[i] = sonar[i].convert_cm(dist[i]);  // I have cm[i] filled with information at this point
+      if(cm[i] == 0){
+        cm[i] = cm_prec[i];
+        }
       }
     }
-    
   
-  // Management of serial communication
+  if(cm[3] < 30) backObstacle = true;
+  else backObstacle = false;
+  
+  minDist = MAX_DISTANCE;
+  
+  for(uint8_t i = 0; i < SONAR_NUM-1; i++){
+    if(cm[i] < minDist){
+      minDist = cm[i];
+      minIndex = i;
+      }
+    }
+  
+  if(minIndex == 0) positionObject = "Front";
+  else if(minIndex == 1) positionObject = "Right";
+  else if(minIndex == 2) positionObject = "Left";
+  
+  if(!moving){
+    Serial.print("Stream of Info-> Right: " + String(cm[1]) + " Front: " + String(cm[0]) + " Left: " + String(cm[2]) + " " + "POSITION: "+positionObject);
+    virhas.stop();
+  }
   
   if(Serial.available() > 0){    
-    String data = Serial.readStringUntil('\n');
-    if(data == "ready"){  // Regular stream of data, looping inside the python script regularly (python script sends "ready" each while True)
-      Serial.print("Stream of Info-> Right: " + String(dist[1]) + " Front: " + String(dist[0]) + " Left: " + String(dist[2]));
-      }      
-    else{ //I input a new action, data is now the movement
-      Serial.print("New action send, executing movement : " + data );
-    }
+    data = Serial.readStringUntil('\n');
+  }
+  else data = " ";
+  
+  if(data != " ") movement = data;
+    
+  if(movement == "move") forward();
+  else{
+    virhas.stop();
+    movement = " ";
+    moving = false;
+  }
+  
 
-  };
 }
 
 void sonarSetup() {
@@ -196,12 +186,22 @@ void sonarSetup() {
     pingTimer[i] = pingTimer[i-1] + PING_INTERVAL;
   
 }
-  
-void echoCheck() {
-  if(sonar[currentSensor].check_timer()){
-    cm[currentSensor] = sonar[currentSensor].ping_result / US_ROUNDTRIP_CM;
-  }
-  else{
-    cm[currentSensor] = MAX_DISTANCE;  //Distance detected in case no ping is done
+
+void forward(){
+  if(minDist > 30){
+    while(actualPosX < 20){
+      moving = true;
+      actualPosY = virhas.getPosY();
+      actualPosX = virhas.getPosX();
+      Serial.print("\n Pos Y: " + String(actualPosY) + " Pos X: " + String(actualPosX));
+      motion.strafe = 0;
+      motion.forward = 0.5;
+      motion.angular = 0;
+      virhas.run2(motion.strafe*_MAX_SPEED, motion.forward*_MAX_SPEED, motion.angular*_MAX_ANGULAR);
+      virhas.PIDLoop();
     }
+    virhas.stop();
+    movement = " ";
+    moving = false;
+  }
 }

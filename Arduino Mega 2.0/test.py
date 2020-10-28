@@ -27,6 +27,9 @@ def on_press(key):
         elif key.char == ("h"):
             movement = "angry"
             receiveMovement = True
+        elif key.char == ("j"):
+            movement = "move"
+            receiveMovement = True
         else:
             movement = movement
     except AttributeError:
@@ -59,15 +62,13 @@ def main():
     
     while True:
         
-        ser.write(b"ready\n")
         line = ser.readline().decode('utf-8').rstrip()
-        print(line)
+        if line: 
+            print(line)
         
         if receiveMovement:
-            
-            ser.write(bytes((movement+'\n'), encoding='utf-8'))      
-            line = ser.readline().decode('utf-8').rstrip()
-            print(line)  
+                        
+            ser.write(bytes((movement+'\n'), encoding='utf-8'))
             receiveMovement = False
         
         if movement == "QUIT":
