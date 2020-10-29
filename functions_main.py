@@ -46,16 +46,11 @@ def send_uno_lights(ser1,action):
         #reproduce_action_sound(action)
         line1 = ser1.readline().decode('utf-8').rstrip()
         
-def send_initial_action_arduino(actual_action, ser,action):
+def send_initial_action_arduino(actual_action, ser, action):
         # actions sent to the Arduino for the initial interaction
         ser.write(bytes((actual_action+'\n'), encoding='utf-8'))
-        
-        # The system will not continue until the movement has been performed
         reproduce_action_sound(action)
-        line = ser.readline().decode('utf-8').rstrip()
-        
-        #reproduce_action_sound(actual_action)
-        #print(line)
+
 
 
 def reproduce_action_sound(action):

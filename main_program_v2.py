@@ -415,6 +415,23 @@ def run_demo(args):
         
         frame = vs.read()
         arduino.new_user_function()
+        
+   
+        # Run Object Detection                
+        previousAngle = angle
+        bboxes, labels_detected, score_detected, bboxes_person = detector_person.detect(frame)
+        main_person = [0,0,0,0]
+        areas=[]
+        for bbox in bboxes_person:
+            area = bbox[2]*bbox[3]
+            areas.append(area)
+        if areas:
+            box_person_num = areas.index(max(areas))
+            main_person = [bboxes_person[box_person_num][0],bboxes_person[box_person_num][1],bboxes_person[box_person_num][2],bboxes_person[box_person_num][3]]
+            angle = human_camera_angle(main_person, camera_width)
+        else:
+            angle = 0
+                    
         t1 = time.perf_counter()
                     
         ####-----START HUMAN INTERACTION-----####
@@ -428,23 +445,7 @@ def run_demo(args):
         if interaction != 2 : #If I'm not interacting with the human
             print("Interaction != 2, I'm not interacting with the human")
             if arduino.old_user != "none": #if an object is detected by the sonar, check if it is a human
-                print("Object detected by sonars") 
-                              
-                # Run Object Detection                
-                previousAngle = angle
-                bboxes, labels_detected, score_detected, bboxes_person = detector_person.detect(frame)
-                main_person = [0,0,0,0]
-                areas=[]
-                for bbox in bboxes_person:
-                    area = bbox[2]*bbox[3]
-                    areas.append(area)
-                if areas:
-                    box_person_num = areas.index(max(areas))
-                    main_person = [bboxes_person[box_person_num][0],bboxes_person[box_person_num][1],bboxes_person[box_person_num][2],bboxes_person[box_person_num][3]]
-                    angle = human_camera_angle(main_person, camera_width)
-                else:
-                    angle = 0
-                    
+                print("Object detected by sonars")                              
                 if angle != 0:  # this can be replaced with a check if it is human, so this translate to if there is a human 
                     print("Human detected in the FOV")
                     count = 4
@@ -482,19 +483,7 @@ def run_demo(args):
                 
             else:    
                 # Run Object Detection
-                previousAngle = angle
-                bboxes, labels_detected, score_detected, bboxes_person = detector_person.detect(frame)
-                main_person = [0,0,0,0]
-                areas=[]
-                for bbox in bboxes_person:
-                    area = bbox[2]*bbox[3]
-                    areas.append(area)
-                if areas:
-                    box_person_num = areas.index(max(areas))
-                    main_person = [bboxes_person[box_person_num][0],bboxes_person[box_person_num][1],bboxes_person[box_person_num][2],bboxes_person[box_person_num][3]]
-                    angle = human_camera_angle(main_person, camera_width)
-                else:
-                    angle = 0
+                
                 if angle != 0: #there is a human in the FOV of robot
                     print("No object, but human in the FOV")
                     interaction = 1
@@ -580,22 +569,7 @@ def run_demo(args):
                     current_time_out_system_hum = time.time()
                     time_out_system_hum = time_out_system_hum+(current_time_out_system_hum-start_time_out_system_hum)
                     start_time_out_system_hum = current_time_out_system_hum
-                    previousAngle = angle
-                    bboxes, labels_detected, score_detected, bboxes_person = detector_person.detect(frame)
-                    main_person = [0,0,0,0]
-                    areas=[]
-                    for bbox in bboxes_person:
-                        area = bbox[2]*bbox[3]
-                        areas.append(area)
-                    if areas:
-                        box_person_num = areas.index(max(areas))
-                        main_person = [bboxes_person[box_person_num][0],bboxes_person[box_person_num][1],bboxes_person[box_person_num][2],bboxes_person[box_person_num][3]]
-                        angle = human_camera_angle(main_person, camera_width)
-                        time_out_system_hum = 0 #if there is a human in the fov stop counting for the timeout
-                        Finding_human = False 
-                        time_out_system = 0     
-                    else:
-                        angle = 0
+                    
                     if angle != 0:
                         print("INTERACTION LOOP - Correctly interacting, waiting to receive an action")
                         if firstTime:
@@ -646,19 +620,7 @@ def run_demo(args):
                 time_out_system = time_out_system+(current_time_out_system-start_time_out_system)
                 start_time_out_system = current_time_out_system
                 print("Time out: {:.1f} / 40 ".format(time_out_system))
-                previousAngle = angle
-                bboxes, labels_detected, score_detected, bboxes_person = detector_person.detect(frame)
-                main_person = [0,0,0,0]
-                areas=[]
-                for bbox in bboxes_person:
-                    area = bbox[2]*bbox[3]
-                    areas.append(area)
-                if areas:
-                    box_person_num = areas.index(max(areas))
-                    main_person = [bboxes_person[box_person_num][0],bboxes_person[box_person_num][1],bboxes_person[box_person_num][2],bboxes_person[box_person_num][3]]
-                    angle = human_camera_angle(main_person, camera_width)
-                else:
-                    angle = 0
+                
                 if angle != 0:  # this can be replaced with a check if it is human, so this translate to if there is a human
                     print("INTERACTION LOOP - Human detecte in the FOV")        
                     Finding_human = False

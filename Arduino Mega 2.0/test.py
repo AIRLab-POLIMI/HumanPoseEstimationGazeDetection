@@ -30,6 +30,12 @@ def on_press(key):
         elif key.char == ("j"):
             movement = "move"
             receiveMovement = True
+        elif key.char == ("n"):
+            movement = "rotateLeft"
+            receiveMovement = True
+        elif key.char == ("m"):
+            movement = "rotateRight"
+            receiveMovement = True
         else:
             movement = movement
     except AttributeError:

@@ -8,15 +8,19 @@
 
 #define SONAR_NUM 4 
 #define MAX_DISTANCE 300 // Max distance returned
-#define PING_INTERVAL 33 // ms between pings from each sensor
-#define BUFF_LEN 10 // Length of the buffer to clean the data
 
 unsigned long pingTimer[SONAR_NUM];
 
-float dist[SONAR_NUM];// Final distance communicated {F, R, L, B}
-float cm[SONAR_NUM]; //To store filtered actual ping distance
-float cm_prec[SONAR_NUM]; //To store filtered previous ping distance
+float dist[SONAR_NUM]; // Final distance communicated {F, R, L, B}
+float cm[SONAR_NUM]; //Filtered sample
+float cm_prec[SONAR_NUM]; // Filtered sample
+float cm_raw[SONAR_NUM]; // Last raw
+float cm_prec1[SONAR_NUM]; // second last raw etc..
+float cm_prec2[SONAR_NUM];
+float cm_prec3[SONAR_NUM];
+float cm_prec4[SONAR_NUM];
 float minDist = MAX_DISTANCE; //Support to calculate which sensor is working
+int numActualData;
 
 int minIndex;
 
@@ -105,42 +109,28 @@ motion_t motion;
 String movement = " ";
 String data = " ";
 
-float actualPosX = 0;
-float actualPosY = 0;
-float actualPosTh = 0;
+int numberAction;
 
 bool start = true;
 bool moving = false;
+int movingCode = 0;
 int count = 0;
 
 void setup() {
 
   virhas.setKpid(2.0, 0.6, 0.5);
   virhas.stop();
-  sonarSetup();
+  Serial.begin(115200);
   
 }
 
 void loop() {
   
   // Reading data from SONAR
-  
-  for(uint8_t i = 0; i < SONAR_NUM; i++){
-    cm_prec[i] = cm[i];
-    }
-  
-  for(uint8_t i = 0; i < SONAR_NUM; i++){
-    if(millis() >= pingTimer[i]){
-      pingTimer[i] += PING_INTERVAL * SONAR_NUM;
-      dist[i] = sonar[i].ping_median(BUFF_LEN);
-      cm[i] = sonar[i].convert_cm(dist[i]);  // I have cm[i] filled with information at this point
-      if(cm[i] == 0){
-        cm[i] = cm_prec[i];
-        }
-      }
-    }
-  
-  if(cm[3] < 30) backObstacle = true;
+  sonarData();
+
+   // I have cm[i] filled with information at this point
+  if(cm[3] < 50) backObstacle = true;
   else backObstacle = false;
   
   minDist = MAX_DISTANCE;
@@ -152,23 +142,38 @@ void loop() {
       }
     }
   
-  if(minIndex == 0) positionObject = "Front";
-  else if(minIndex == 1) positionObject = "Right";
-  else if(minIndex == 2) positionObject = "Left";
+  if(minIndex == 0) positionObject = "front";
+  else if(minIndex == 1) positionObject = "right";
+  else if(minIndex == 2) positionObject = "left";
   
-  if(!moving){
-    Serial.print("Stream of Info-> Right: " + String(cm[1]) + " Front: " + String(cm[0]) + " Left: " + String(cm[2]) + " " + "POSITION: "+positionObject);
-    virhas.stop();
-  }
+  if(moving) movingCode = 1;
+  else movingCode = 0;
+ 
+  //Serial.print("Stream of Info-> Right: " + String(cm[1]) + " Front: " + String(cm[0]) + " Left: " + String(cm[2]) + " " + " Back: "+ String(cm[3]) + "\n");
+  //delay(300);
+  Serial.print(positionObject + " " + String(minDist) + " " + String(movingCode) + "\n");
+ 
+
+  data = " ";
   
-  if(Serial.available() > 0){    
+  
+  if(Serial.available() > 0 && !moving){
     data = Serial.readStringUntil('\n');
   }
-  else data = " ";
+  
   
   if(data != " ") movement = data;
+  
+  numberAction = 0;
     
   if(movement == "move") forward();
+  else if (movement == "rotateLeft") rotate(-1);
+  else if (movement == "rotateRight") rotate(1);
+  else if (movement == "scared") backward(0.3);
+  else if (movement == "very_scared") backward(0.5);
+  else if (movement == "excited_attract") sideStrafes();
+  else if (movement == "interested_excited") smallRotations();
+  else if (movement == "happy") bigRotations();
   else{
     virhas.stop();
     movement = " ";
@@ -178,30 +183,248 @@ void loop() {
 
 }
 
-void sonarSetup() {
-  
-  Serial.begin(115200);
-  pingTimer[0] = millis() + 75;
-  for(uint8_t i = 1; i < SONAR_NUM; i++)
-    pingTimer[i] = pingTimer[i-1] + PING_INTERVAL;
-  
-}
 
-void forward(){
+void sonarData(){
+  
+  for(uint8_t i = 0; i < SONAR_NUM; i++){
+    
+    cm_prec4[i] = cm_prec3[i];
+    cm_prec3[i] = cm_prec2[i];
+    cm_prec2[i] = cm_prec1[i];
+    cm_prec1[i] = cm_raw[i];
+    cm_prec[i] = cm[i];
+  }
+  
+  for(uint8_t i = 0; i < SONAR_NUM; i++){
+    cm_raw[i] = sonar[i].ping_cm();
+    numActualData = 0;
+    if(cm_raw[i] == 0){
+      if(cm_prec1[i] + cm_prec2[i] + cm_prec3[i] + cm_prec4[i] == 0) cm[i] = MAX_DISTANCE;  //If it's 0 (ping not returned) and all the precedent are zero, then is a real zero
+      else{
+        numActualData = 0;
+        if (cm_prec1[i] != 0) numActualData++;
+        if (cm_prec2[i] != 0) numActualData++;
+        if (cm_prec3[i] != 0) numActualData++;
+        if (cm_prec4[i] != 0) numActualData++;
+        cm[i] = (cm_prec1[i] + cm_prec2[i] + cm_prec3[i] + cm_prec4[i])/ numActualData; //If it's 0 but there i data in the "buffer" than the real result is the mean of the buffer
+      }
+    }
+    else{
+      if (cm_prec1[i] != 0) numActualData++;
+      if (cm_prec2[i] != 0) numActualData++;
+      if (cm_prec3[i] != 0) numActualData++;
+      if (cm_prec4[i] != 0) numActualData++;
+      cm[i] = (cm_raw[i] + cm_prec1[i] + cm_prec2[i] + cm_prec3[i] + cm_prec4[i])/(numActualData+1);      
+    }
+  }
+}
+void forward(){ // circa 20 cm forward
   if(minDist > 30){
-    while(actualPosX < 20){
+    if(virhas.getPosX() < 20){
       moving = true;
-      actualPosY = virhas.getPosY();
-      actualPosX = virhas.getPosX();
-      Serial.print("\n Pos Y: " + String(actualPosY) + " Pos X: " + String(actualPosX));
       motion.strafe = 0;
-      motion.forward = 0.5;
+      motion.forward = 0.3;
       motion.angular = 0;
       virhas.run2(motion.strafe*_MAX_SPEED, motion.forward*_MAX_SPEED, motion.angular*_MAX_ANGULAR);
       virhas.PIDLoop();
     }
+    else{
+      virhas.stop();
+      movement = " ";
+      moving = false;
+    }
+  }
+  else{
     virhas.stop();
     movement = " ";
     moving = false;
   }
+}
+
+void backward(float speed){ // circa 40 cm backward at i speed
+  if(!backObstacle){
+    if(abs(virhas.getPosX()) < 40){
+      moving = true;
+      motion.strafe = 0;
+      motion.forward = speed*(-1);
+      motion.angular = 0;
+      virhas.run2(motion.strafe*_MAX_SPEED, motion.forward*_MAX_SPEED, motion.angular*_MAX_ANGULAR);
+      virhas.PIDLoop();
+    }
+    else{
+      virhas.stop();
+      movement = " ";
+      moving = false;
+    }
+  }
+  else{
+    i = 1;
+    while(abs(virhas.getPosTh()) < PI/6){
+        moving = true;
+        motion.strafe = 0;
+        motion.forward = 0;
+        motion.angular = 0.3*i;
+        virhas.run2(motion.strafe*_MAX_SPEED, motion.forward*_MAX_SPEED, motion.angular*_MAX_ANGULAR);
+        virhas.PIDLoop();
+    }
+    virhas.stop();
+    while(numberAction < 5){ // KEEP THIS ODD
+      i = i*(-1);
+      while(abs(virhas.getPosTh()) < PI/3){
+        moving = true;
+        motion.strafe = 0;
+        motion.forward = 0;
+        motion.angular = i*(speed + 0.2);
+        virhas.run2(motion.strafe*_MAX_SPEED, motion.forward*_MAX_SPEED, motion.angular*_MAX_ANGULAR);
+        virhas.PIDLoop();
+      }
+      numberAction++; 
+      virhas.stop();
+    }
+    virhas.stop();
+    i = 1; 
+    while(abs(virhas.getPosTh()) < PI/6){
+        moving = true;
+        motion.strafe = 0;
+        motion.forward = 0;
+        motion.angular = 0.3*i;
+        virhas.run2(motion.strafe*_MAX_SPEED, motion.forward*_MAX_SPEED, motion.angular*_MAX_ANGULAR);
+        virhas.PIDLoop();
+    }
+    virhas.stop();
+    movement = " ";
+    moving = false;    
+  }
+}
+
+void rotate(int i){ // i is the direction of rotation
+  
+  while(abs(virhas.getPosTh()) < (PI/6)){
+    moving = true;
+    motion.strafe = 0;
+    motion.forward = 0;
+    motion.angular = i*0.3;
+    virhas.run2(motion.strafe*_MAX_SPEED, motion.forward*_MAX_SPEED, motion.angular*_MAX_ANGULAR);
+    virhas.PIDLoop();
+  }
+  virhas.stop();
+  movement = " ";
+  moving = false;
+}
+
+void sideStrafes(){
+  int i = 1;
+  while(abs(virhas.getPosY()) < 2.5){
+      moving = true;
+      motion.strafe = 0.8*i;
+      motion.forward = 0;
+      motion.angular = 0;
+      virhas.run2(motion.strafe*_MAX_SPEED, motion.forward*_MAX_SPEED, motion.angular*_MAX_ANGULAR);
+      virhas.PIDLoop();
+  }
+  virhas.stop();
+  while(numberAction < 7){ // KEEP THIS ODD
+    i = i*(-1);
+    while(abs(virhas.getPosY()) < 5){
+      moving = true;
+      motion.strafe = 0.8*i;
+      motion.forward = 0;
+      motion.angular = 0;
+      virhas.run2(motion.strafe*_MAX_SPEED, motion.forward*_MAX_SPEED, motion.angular*_MAX_ANGULAR);
+      virhas.PIDLoop();
+    }
+    numberAction++; 
+    virhas.stop();
+  }
+  virhas.stop();
+  i = 1; 
+  while(abs(virhas.getPosY()) < 2.5){
+      moving = true;
+      motion.strafe = 0.8*i;
+      motion.forward = 0;
+      motion.angular = 0;
+      virhas.run2(motion.strafe*_MAX_SPEED, motion.forward*_MAX_SPEED, motion.angular*_MAX_ANGULAR);
+      virhas.PIDLoop();
+  }
+  virhas.stop();
+  movement = " ";
+  moving = false;    
+}
+
+void smallRotations(){
+  int i = 1;
+  while(abs(virhas.getPosTh()) < PI/12){
+      moving = true;
+      motion.strafe = 0;
+      motion.forward = 0;
+      motion.angular = 0.8*i;
+      virhas.run2(motion.strafe*_MAX_SPEED, motion.forward*_MAX_SPEED, motion.angular*_MAX_ANGULAR);
+      virhas.PIDLoop();
+  }
+  virhas.stop();
+  while(numberAction < 7){ // KEEP THIS ODD
+    i = i*(-1);
+    while(abs(virhas.getPosTh()) < PI/6){
+      moving = true;
+      motion.strafe = 0;
+      motion.forward = 0;
+      motion.angular = 0.8*i;
+      virhas.run2(motion.strafe*_MAX_SPEED, motion.forward*_MAX_SPEED, motion.angular*_MAX_ANGULAR);
+      virhas.PIDLoop();
+    }
+    numberAction++; 
+    virhas.stop();
+  }
+  virhas.stop();
+  i = 1; 
+  while(abs(virhas.getPosTh()) < PI/12){
+      moving = true;
+      motion.strafe = 0;
+      motion.forward = 0;
+      motion.angular = 0.8*i;
+      virhas.run2(motion.strafe*_MAX_SPEED, motion.forward*_MAX_SPEED, motion.angular*_MAX_ANGULAR);
+      virhas.PIDLoop();
+  }
+  virhas.stop();
+  movement = " ";
+  moving = false;    
+}
+
+void bigRotations(){
+  int i = 1;
+  while(abs(virhas.getPosTh()) < PI/6){
+      moving = true;
+      motion.strafe = 0;
+      motion.forward = 0;
+      motion.angular = 0.8*i;
+      virhas.run2(motion.strafe*_MAX_SPEED, motion.forward*_MAX_SPEED, motion.angular*_MAX_ANGULAR);
+      virhas.PIDLoop();
+  }
+  virhas.stop();
+  while(numberAction < 2){ 
+    i = i*(-1);
+    while(abs(virhas.getPosTh()) < 2*PI){
+      moving = true;
+      motion.strafe = 0;
+      motion.forward = 0;
+      motion.angular = 0.8*i;
+      virhas.run2(motion.strafe*_MAX_SPEED, motion.forward*_MAX_SPEED, motion.angular*_MAX_ANGULAR);
+      virhas.PIDLoop();
+    }
+    numberAction++; 
+    virhas.stop();
+  }
+  virhas.stop();
+  i = -1; 
+  while(abs(virhas.getPosTh()) < PI/6){
+      moving = true;
+      motion.strafe = 0;
+      motion.forward = 0;
+      motion.angular = 0.8*i;
+      virhas.run2(motion.strafe*_MAX_SPEED, motion.forward*_MAX_SPEED, motion.angular*_MAX_ANGULAR);
+      virhas.PIDLoop();
+  }
+  virhas.stop();
+  movement = " ";
+  moving = false;    
 }
