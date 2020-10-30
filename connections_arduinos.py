@@ -25,9 +25,12 @@ def new_user_function():
      
     global new_dist
     global old_user  
-    global moving 
+    global moving
+    sending = "ready"
     
+    ser.write(bytes((sending+'\n'), encoding='utf-8'))
     line = ser.readline().decode('utf-8').rstrip()
+    
     if line:
         print(line)
         data = line.split()
@@ -35,6 +38,7 @@ def new_user_function():
             old_user = data[0]
             new_dist = float(data[1])
             moving = data[2]
+    readFromMega = False
     
             
         

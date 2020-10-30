@@ -151,18 +151,19 @@ void loop() {
  
   //Serial.print("Stream of Info-> Right: " + String(cm[1]) + " Front: " + String(cm[0]) + " Left: " + String(cm[2]) + " " + " Back: "+ String(cm[3]) + "\n");
   //delay(300);
-  Serial.print(positionObject + " " + String(minDist) + " " + String(movingCode) + "\n");
  
 
   data = " ";
   
+  // I send data to raspberry according to the speed of his while True
   
   if(Serial.available() > 0 && !moving){
     data = Serial.readStringUntil('\n');
+    Serial.print(positionObject + " " + String(minDist) + " " + String(movingCode) + "\n");
   }
   
   
-  if(data != " ") movement = data;
+  if(data != " " && data!= "ready") movement = data;
   
   numberAction = 0;
     

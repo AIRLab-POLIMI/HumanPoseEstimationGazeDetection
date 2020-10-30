@@ -78,12 +78,12 @@ def reproduce_action_sound(action):
         elif(action == "angry"):
             run("lxterminal -e omxplayer --vol 600 sounds/Snappy_R2D2.mp3 &",shell=True)
             
-def decide_action(action,movement):
+def decide_action(action):
     global previous_action
     global current_action
     global state_user
     state = state_user
-    obtain_user_state(action,movement)
+    obtain_user_state(action)
     if(((state =="interested_scared" )and(previous_action == "interested_excited")) or ((state =="interested_scared" )and(previous_action == "happy")) or ((state =="interested_scared" )and(previous_action == "scared")) or ((state =="interested_scared" )and(previous_action == "very_scared")) or ((state =="interested_scared" )and(previous_action == "sad")) or ((state =="scared" )and(previous_action == "interested_excited")) or ((state =="scared" )and(previous_action == "happy")) or ((state =="scared" )and(previous_action == "angry")) or ((state =="scared" )and(previous_action == "sad")) or ((state =="scared" )and(previous_action == "none"))):
         current_action = "excited_attract"
     elif(((state =="interested_scared" )and(previous_action == "excited_attract")) or ((state =="interested_scared" )and(previous_action == "angry")) or ((state =="interested_scared" )and(previous_action == "none")) or ((state =="scared" )and(previous_action == "excited_attract")) or ((state =="scared" )and(previous_action == "scared")) or ((state =="scared" )and(previous_action == "very_scared"))):
@@ -99,24 +99,15 @@ def decide_action(action,movement):
     elif(((state =="scared_aggressive" )and(previous_action == "very_scared"))):
         current_action = "angry"    
     previous_action = current_action
-
     
-def obtain_user_state(action,movement):
+def obtain_user_state(action):
     global state_user
-    if(((action == "touch")and(movement == "forward")) or ((action == "hug")and(movement == "forward")) or ((action == "none")and(movement == "forward")) or ((action == "hug")and(movement == "stopped"))):
-        state_user = "interested_interacting"
-    elif (((action == "push")and(movement == "forward")) or ((action == "hit")and(movement == "forward")) or ((action == "push")and(movement == "stopped")) or ((action == "hit")and(movement == "stopped")) or ((action == "hit")and(movement == "backward"))):
-        state_user = "scared_aggressive"
-    elif(((action == "touch")and(movement == "backward")) or ((action == "touch")and(movement == "stopped")) or ((action == "none")and(movement == "stopped"))):
-        state_user = "interested_scared"
-    elif(((action == "none")and(movement == "backward"))):
-        state_user = "scared"
-    elif(((action == "strongHug")and(movement == "forward")) or ((action == "strongHug")and(movement == "stopped"))):
-        state_user = "gaming_aggressive"
-    else:
-        state_user=state_user
-    #print(state_user)
-        
+    if action == "touch": state_user = "interested_scared"
+    elif action == "push": state_user = "scared"
+    elif action == "hit": state_user = "scared_aggressive"
+    elif action == "hug": state_user = "interested_interacting"
+    elif action == "strongHug": state_user = "gaming_aggressive"
+    else: state_user = state_user        
         
     
     

@@ -60,7 +60,7 @@ def build_argparser():
                         help="Specify the target to infer on CPU, GPU, or MYRIAD")
     parser.add_argument("--person_label", type=int, required=False, default=1, help="Label of class person for detector")
     parser.add_argument("--modality", type=str, default="Multi", help="Define the modality of representation of the output. Set single to visualize the skeleton of the main actor")
-    parser.add_argument("--no_show",required=True, help='Optional. Do not display output.', action='store_true')
+    parser.add_argument("--no_show", help='Optional. Do not display output.', action='store_true')
     return parser
 
 
@@ -97,6 +97,7 @@ class WebcamVideoStream:
         #stop the thread
         self.stopped = True
         
+
 def on_press(key):
     global child_action
     global JointAttention
@@ -314,6 +315,7 @@ def run_demo(args):
     
     time.sleep(2)
     arduino.new_user_function()
+    
     functions_main.send_uno_lights(arduino.ser1,"none") 
     functions_main.send_uno_lights(arduino.ser1, "move")
     
@@ -408,14 +410,32 @@ def run_demo(args):
     
     #Camera Thread
     vs = WebcamVideoStream(camera_width, camera_height, src=0).start()
+    #datas = dataStream().start()
     
     functions_main.send_uno_lights(arduino.ser1,"none") 
     
     while True:
         
-        frame = vs.read()
-        arduino.new_user_function()
         t1 = time.perf_counter()
+        frame = vs.read()
+                
+        arduino.new_user_function()
+        
+   
+        # Run Object Detection                
+        previousAngle = angle
+        bboxes, labels_detected, score_detected, bboxes_person = detector_person.detect(frame)
+        main_person = [0,0,0,0]
+        areas=[]
+        for bbox in bboxes_person:
+            area = bbox[2]*bbox[3]
+            areas.append(area)
+        if areas:
+            box_person_num = areas.index(max(areas))
+            main_person = [bboxes_person[box_person_num][0],bboxes_person[box_person_num][1],bboxes_person[box_person_num][2],bboxes_person[box_person_num][3]]
+            angle = human_camera_angle(main_person, camera_width)
+        else:
+            angle = 0
                     
         ####-----START HUMAN INTERACTION-----####
         count = 0
@@ -428,23 +448,7 @@ def run_demo(args):
         if interaction != 2 : #If I'm not interacting with the human
             print("Interaction != 2, I'm not interacting with the human")
             if arduino.old_user != "none": #if an object is detected by the sonar, check if it is a human
-                print("Object detected by sonars") 
-                              
-                # Run Object Detection                
-                previousAngle = angle
-                bboxes, labels_detected, score_detected, bboxes_person = detector_person.detect(frame)
-                main_person = [0,0,0,0]
-                areas=[]
-                for bbox in bboxes_person:
-                    area = bbox[2]*bbox[3]
-                    areas.append(area)
-                if areas:
-                    box_person_num = areas.index(max(areas))
-                    main_person = [bboxes_person[box_person_num][0],bboxes_person[box_person_num][1],bboxes_person[box_person_num][2],bboxes_person[box_person_num][3]]
-                    angle = human_camera_angle(main_person, camera_width)
-                else:
-                    angle = 0
-                    
+                print("Object detected by sonars")                              
                 if angle != 0:  # this can be replaced with a check if it is human, so this translate to if there is a human 
                     print("Human detected in the FOV")
                     count = 4
@@ -461,7 +465,7 @@ def run_demo(args):
                         Finding_human = False
                     else: #if it find an object that is not a human, must rotate until that obstacle is an human
                         print("Object from sonar is not a human")
-                        if (abs(angle)<=10 and arduino.new_dist > 40): #the human is in front of the robot and eventually right/left osbstacle are far
+                        if (abs(angle)<=10 and arduino.new_dist > 150): #the human is in front of the robot and eventually right/left osbstacle are far
                             print("Human in front of me - Approaching ")
                             functions_main.send_uno_lights(arduino.ser1, "move")
                             functions_main.send_initial_action_arduino("move", arduino.ser, "move")
@@ -482,19 +486,7 @@ def run_demo(args):
                 
             else:    
                 # Run Object Detection
-                previousAngle = angle
-                bboxes, labels_detected, score_detected, bboxes_person = detector_person.detect(frame)
-                main_person = [0,0,0,0]
-                areas=[]
-                for bbox in bboxes_person:
-                    area = bbox[2]*bbox[3]
-                    areas.append(area)
-                if areas:
-                    box_person_num = areas.index(max(areas))
-                    main_person = [bboxes_person[box_person_num][0],bboxes_person[box_person_num][1],bboxes_person[box_person_num][2],bboxes_person[box_person_num][3]]
-                    angle = human_camera_angle(main_person, camera_width)
-                else:
-                    angle = 0
+                
                 if angle != 0: #there is a human in the FOV of robot
                     print("No object, but human in the FOV")
                     interaction = 1
@@ -533,23 +525,6 @@ def run_demo(args):
                     time_out_system_hum = 0
                     tooCloseCount=0
                     tooFarCount += 1
-                    previousAngle = angle
-                    bboxes, labels_detected, score_detected, bboxes_person = detector_person.detect(frame)
-                    main_person = [0,0,0,0]
-                    areas=[]
-                    for bbox in bboxes_person:
-                        area = bbox[2]*bbox[3]
-                        areas.append(area)
-                    if areas:
-                        box_person_num = areas.index(max(areas))
-                        main_person = [bboxes_person[box_person_num][0],bboxes_person[box_person_num][1],bboxes_person[box_person_num][2],bboxes_person[box_person_num][3]]
-                        angle = human_camera_angle(main_person, camera_width)
-                        time_out_system_hum = 0 #if there is a human in the fov stop counting for the timeout
-                        Finding_human = False 
-                        time_out_system = 0     
-                    else:
-                        angle = 0
-                        
                     if tooFarCount > 10:
                         if abs(angle)<=10 :
                             print("INTERACTION LOOP - Child is far and in front ")
@@ -564,7 +539,7 @@ def run_demo(args):
                             print("INTERACTION LOOP - Child is on the left ")
                             functions_main.send_uno_lights(arduino.ser1, "none")
                             functions_main.send_initial_action_arduino("rotateLeft", arduino.ser, "none")
-                elif arduino.new_dist < 20.0:
+                elif arduino.new_dist < 40.0:
                     tooCloseCount += 1
                     tooFarCount = 0
                     time_out_system_hum = 0
@@ -580,24 +555,10 @@ def run_demo(args):
                     current_time_out_system_hum = time.time()
                     time_out_system_hum = time_out_system_hum+(current_time_out_system_hum-start_time_out_system_hum)
                     start_time_out_system_hum = current_time_out_system_hum
-                    previousAngle = angle
-                    bboxes, labels_detected, score_detected, bboxes_person = detector_person.detect(frame)
-                    main_person = [0,0,0,0]
-                    areas=[]
-                    for bbox in bboxes_person:
-                        area = bbox[2]*bbox[3]
-                        areas.append(area)
-                    if areas:
-                        box_person_num = areas.index(max(areas))
-                        main_person = [bboxes_person[box_person_num][0],bboxes_person[box_person_num][1],bboxes_person[box_person_num][2],bboxes_person[box_person_num][3]]
-                        angle = human_camera_angle(main_person, camera_width)
-                        time_out_system_hum = 0 #if there is a human in the fov stop counting for the timeout
-                        Finding_human = False 
-                        time_out_system = 0     
-                    else:
-                        angle = 0
+                    
                     if angle != 0:
                         print("INTERACTION LOOP - Correctly interacting, waiting to receive an action")
+                        time_out_system_hum = 0
                         if firstTime:
                                 functions_main.send_uno_lights(arduino.ser1,"excited_attract")
                                 functions_main.send_initial_action_arduino("excited_attract", arduino.ser, "excited_attract")
@@ -605,7 +566,7 @@ def run_demo(args):
                                 firstTime = False
                         if receiveAction:                                        
                             if child_action != "joint":
-                                functions_main.decide_action(child_action, arduino.user_movement) #decide robot behaviour based on action of the child and movement of the robot
+                                functions_main.decide_action(child_action) #decide robot behaviour based on action of the child and movement of the robot
                                 functions_main.send_uno_lights(arduino.ser1, functions_main.current_action)
                                 functions_main.send_initial_action_arduino( functions_main.current_action, arduino.ser, functions_main.current_action)
                                 functions_main.send_uno_lights(arduino.ser1, "none")
@@ -637,7 +598,8 @@ def run_demo(args):
                     else: #if no human
                         if previousAngle > 0 and angle == 0: lookTo = "rotateRight"
                         elif previousAngle < 0 and angle == 0: lookTo = "rotateLeft"
-                    print("Child Action: " + child_action + " | " + "Robot Action: " + functions_main.current_action + " | " + "Time Out Human {:.1f} / 15 Sec".format(time_out_system_hum) )
+                    print("Child Action: " + child_action + " | " + "Robot Action: " + functions_main.current_action)
+                print("Time Out Human {:.1f} / 15 Sec".format(time_out_system_hum) )
             elif Finding_human == True and time_out_system < TIME_OUT : #if i need to find the child and i'm inside the timout
                 print("INTERACTION LOOP - Looking for a human")
                 #I need to find the human. I start counting for the general TIME_OUT
@@ -646,19 +608,7 @@ def run_demo(args):
                 time_out_system = time_out_system+(current_time_out_system-start_time_out_system)
                 start_time_out_system = current_time_out_system
                 print("Time out: {:.1f} / 40 ".format(time_out_system))
-                previousAngle = angle
-                bboxes, labels_detected, score_detected, bboxes_person = detector_person.detect(frame)
-                main_person = [0,0,0,0]
-                areas=[]
-                for bbox in bboxes_person:
-                    area = bbox[2]*bbox[3]
-                    areas.append(area)
-                if areas:
-                    box_person_num = areas.index(max(areas))
-                    main_person = [bboxes_person[box_person_num][0],bboxes_person[box_person_num][1],bboxes_person[box_person_num][2],bboxes_person[box_person_num][3]]
-                    angle = human_camera_angle(main_person, camera_width)
-                else:
-                    angle = 0
+                
                 if angle != 0:  # this can be replaced with a check if it is human, so this translate to if there is a human
                     print("INTERACTION LOOP - Human detecte in the FOV")        
                     Finding_human = False
@@ -687,9 +637,25 @@ def run_demo(args):
         
         if args.no_show:
             print("Cicli al secondo: {:.1f} ".format(float(fps)))
-            continue 
+            continue
+        
+        
+        #visualization
+        for bbox in bboxes:
+            cv2.rectangle(frame, (bbox[0], bbox[1]), (bbox[0] + bbox[2], bbox[1] + bbox[3]), (0, 0, 255), 1)
+            if len(labels_detected)>0:
+                cv2.putText(frame, labels[labels_detected[i].astype(int)], (bbox[0]+3,bbox[1]-7), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255,255,255))
+        i+=1
+        
+        cv2.putText(frame, "FPS: {:.1f}".format(float(fps)), (5,20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255,255,255), 1)
+        cv2.imshow('Demo', frame)
+        
+        key = cv2.waitKey(1)            
+        if key == 27:
+            break
         
     vs.stop()
+    #datas.stop()
 
 if __name__ == "__main__":
     args = build_argparser().parse_args()
