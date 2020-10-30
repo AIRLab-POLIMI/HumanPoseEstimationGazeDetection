@@ -157,7 +157,7 @@ void loop() {
   
   // I send data to raspberry according to the speed of his while True
   
-  if(Serial.available() > 0 && !moving){
+  if(Serial.available() > 0){
     data = Serial.readStringUntil('\n');
     Serial.print(positionObject + " " + String(minDist) + " " + String(movingCode) + "\n");
   }
@@ -304,7 +304,7 @@ void rotate(int i){ // i is the direction of rotation
     moving = true;
     motion.strafe = 0;
     motion.forward = 0;
-    motion.angular = i*0.3;
+    motion.angular = i*0.15;
     virhas.run2(motion.strafe*_MAX_SPEED, motion.forward*_MAX_SPEED, motion.angular*_MAX_ANGULAR);
     virhas.PIDLoop();
   }
@@ -315,7 +315,7 @@ void rotate(int i){ // i is the direction of rotation
 
 void sideStrafes(){
   int i = 1;
-  while(abs(virhas.getPosY()) < 2.5){
+  while(abs(virhas.getPosY()) < 1.25){
       moving = true;
       motion.strafe = 0.8*i;
       motion.forward = 0;
@@ -326,7 +326,7 @@ void sideStrafes(){
   virhas.stop();
   while(numberAction < 7){ // KEEP THIS ODD
     i = i*(-1);
-    while(abs(virhas.getPosY()) < 5){
+    while(abs(virhas.getPosY()) < 2.5){
       moving = true;
       motion.strafe = 0.8*i;
       motion.forward = 0;
@@ -339,7 +339,7 @@ void sideStrafes(){
   }
   virhas.stop();
   i = 1; 
-  while(abs(virhas.getPosY()) < 2.5){
+  while(abs(virhas.getPosY()) < 1.25){
       moving = true;
       motion.strafe = 0.8*i;
       motion.forward = 0;
@@ -397,7 +397,7 @@ void bigRotations(){
       moving = true;
       motion.strafe = 0;
       motion.forward = 0;
-      motion.angular = 0.8*i;
+      motion.angular = 0.6*i;
       virhas.run2(motion.strafe*_MAX_SPEED, motion.forward*_MAX_SPEED, motion.angular*_MAX_ANGULAR);
       virhas.PIDLoop();
   }
@@ -408,7 +408,7 @@ void bigRotations(){
       moving = true;
       motion.strafe = 0;
       motion.forward = 0;
-      motion.angular = 0.8*i;
+      motion.angular = 0.6*i;
       virhas.run2(motion.strafe*_MAX_SPEED, motion.forward*_MAX_SPEED, motion.angular*_MAX_ANGULAR);
       virhas.PIDLoop();
     }
@@ -421,7 +421,7 @@ void bigRotations(){
       moving = true;
       motion.strafe = 0;
       motion.forward = 0;
-      motion.angular = 0.8*i;
+      motion.angular = 0.6*i;
       virhas.run2(motion.strafe*_MAX_SPEED, motion.forward*_MAX_SPEED, motion.angular*_MAX_ANGULAR);
       virhas.PIDLoop();
   }

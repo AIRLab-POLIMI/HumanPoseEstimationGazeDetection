@@ -522,11 +522,11 @@ def run_demo(args):
                 time_out_system = 0
                 print("Distance from sonar = {:.1f}".format(arduino.new_dist))
                 if arduino.new_dist > 120.0: #if the distance to the chld is bigger than , get closer
-                    time_out_system_hum = 0
                     tooCloseCount=0
                     tooFarCount += 1
                     if tooFarCount > 10:
-                        if abs(angle)<=10 :
+                        tooFarCount = 0
+                        if abs(angle)<=10 and angle !=0 :
                             print("INTERACTION LOOP - Child is far and in front ")
                             functions_main.send_uno_lights(arduino.ser1, "move")
                             functions_main.send_initial_action_arduino("move", arduino.ser, "move_find")
@@ -542,7 +542,6 @@ def run_demo(args):
                 elif arduino.new_dist < 40.0:
                     tooCloseCount += 1
                     tooFarCount = 0
-                    time_out_system_hum = 0
                     if tooCloseCount > 10: #If I'm too cloose for too much time ( I need this time window in order to let the children interact with the robot)
                         print("INTERACTION LOOP - Too close")
                         functions_main.send_uno_lights(arduino.ser1, "move")
