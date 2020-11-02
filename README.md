@@ -44,7 +44,6 @@ optional arguments:
 # main_program.py
 
 This is the script that actually implement all the control loop designed for the behavior of the robot. See the informations above about arguments.
-The only change is that the --no_show argument needs to be passed: visualization of the camera is not yet implemented.
 
 During the script, if you are in the INTERACTION LOOP, you can simulate the actions that the child could do with the robot.
 
