@@ -304,7 +304,7 @@ def human_camera_angle(person, im_width):
     return angle
 
 
-child_action = "none"
+child_action = " "
 JointAttention = False
 receiveAction = False
 breakFromKey = False
@@ -579,13 +579,12 @@ def run_demo(args):
                             duration_JA = duration_JA + (actual_time_JA - start_time_JA)
                             print("Measuring Joint attention")
                             functions_main.send_uno_lights(arduino.ser1, "happy")
-                            color_image = frame
-                            color_image = cv2.resize(color_image, (model_width, model_height))
-                            prepimg = color_image[:, :, ::-1].copy() 
-                            res, inference_time = engine.DetectPosesInImage(prepimg)
+                            frame = cv2.resize(frame, (model_width, model_height))
+                            frame = frame[:, :, ::-1].copy() 
+                            res, inference_time = engine.DetectPosesInImage(frame)
                             if res:
                                 head, scores_head = elaborate_pose(res)
-                                prediction = elaborate_gaze(imdraw, head, scores_head, model_gaze)
+                                prediction = elaborate_gaze(frame, head, scores_head, model_gaze)
                                 print("Gaze versor: {}".format(prediction[0,:-1]))
                                 print("Time: {}".format(duration_JA))
                         elif duration_JA >= JA_TIME:
@@ -594,6 +593,7 @@ def run_demo(args):
                             start_time_JA = 0
                             duration_JA = 0
                             actual_time_JA = 0
+                            JointAttention = False
                     else: #if no human
                         if previousAngle > 0 and angle == 0: lookTo = "rotateRight"
                         elif previousAngle < 0 and angle == 0: lookTo = "rotateLeft"

@@ -118,7 +118,7 @@ int count = 0;
 
 void setup() {
 
-  virhas.setKpid(2.0, 0.6, 0.5);
+  virhas.setKpid(2, 0.6, 0.7);
   virhas.stop();
   Serial.begin(115200);
   
@@ -304,7 +304,7 @@ void rotate(int i){ // i is the direction of rotation
     moving = true;
     motion.strafe = 0;
     motion.forward = 0;
-    motion.angular = i*0.15;
+    motion.angular = i*0.3;
     virhas.run2(motion.strafe*_MAX_SPEED, motion.forward*_MAX_SPEED, motion.angular*_MAX_ANGULAR);
     virhas.PIDLoop();
   }
