@@ -13,7 +13,7 @@
 #endif
 
 // DEfine the pin used for the strip of leds
-#define LED_PIN    6
+#define LED_PIN   12
 
 // Number of leds on the strip
 #define LED_COUNT 14
@@ -55,12 +55,6 @@ void loop() {
     rainbowane();
   if(action == "rotate")
     colorWipe(strip.Color(255,   0, 255), 10); // Magenta
-  if(action == "rotateRight")
-    turn_off();
-    //strip.clear();
-  if(action == "rotateLeft")
-    turn_off();
-    //strip.clear();
   if(action ==  "move")
     colorWipe(strip.Color(0, 255, 0), 10); // green
   if(action ==  "scared")

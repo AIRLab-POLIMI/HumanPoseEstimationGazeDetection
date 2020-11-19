@@ -6,7 +6,7 @@ import serial
 
 # in order to stablish the communication between arduino and raspberry
 ser = serial.Serial('/dev/ttyACM0', 115200, timeout=1)
-ser1 = serial.Serial('/dev/ttyACM1', 115200, timeout=1)
+ser1 = serial.Serial('/dev/ttyUSB0', 115200, timeout=1)
 ser.flush()
 ser1.flush()
 

@@ -469,18 +469,17 @@ def run_demo(args):
                             print("Human in front of me - Approaching ")
                             functions_main.send_uno_lights(arduino.ser1, "move")
                             functions_main.send_initial_action_arduino("move", arduino.ser, "move")
-                            functions_main.send_uno_lights(arduino.ser1, "none")
                         elif angle >=10:
                                 print("Human detected in right position...")
-                                functions_main.send_uno_lights(arduino.ser1, "none")
+                                functions_main.send_uno_lights(arduino.ser1, "rotateRight")
                                 functions_main.send_initial_action_arduino("rotateRight", arduino.ser, "none")
                         elif angle <= -10:
                             print("Human detected in left position...")
-                            functions_main.send_uno_lights(arduino.ser1, "none")
+                            functions_main.send_uno_lights(arduino.ser1, "rotateLeft")
                             functions_main.send_initial_action_arduino("rotateLeft", arduino.ser, "none")
                 else : #if there is no human
                     print("Searching ...")
-                    functions_main.send_uno_lights(arduino.ser1, "none")
+                    functions_main.send_uno_lights(arduino.ser1, "rotateRight")
                     functions_main.send_initial_action_arduino("rotateRight", arduino.ser, "none")
                 print("No object close")
                 
@@ -494,18 +493,17 @@ def run_demo(args):
                         print("Approaching the human")
                         functions_main.send_uno_lights(arduino.ser1, "move")
                         functions_main.send_initial_action_arduino("move", arduino.ser, "move")
-                        functions_main.send_uno_lights(arduino.ser1, "none")
                     elif angle >=10:
                             print("Searching right...")
-                            functions_main.send_uno_lights(arduino.ser1, "none")
+                            functions_main.send_uno_lights(arduino.ser1, "rotateRight")
                             functions_main.send_initial_action_arduino("rotateRight", arduino.ser, "none")
                     elif angle <= -10:
                         print("Searching left...")
-                        functions_main.send_uno_lights(arduino.ser1, "none")
+                        functions_main.send_uno_lights(arduino.ser1, "rotateLeft")
                         functions_main.send_initial_action_arduino("rotateLeft", arduino.ser, "none")
                 else: #if there is no human
                     print("Searching")
-                    functions_main.send_uno_lights(arduino.ser1, "none")
+                    functions_main.send_uno_lights(arduino.ser1, "rotateRight")
                     functions_main.send_initial_action_arduino("rotateRight", arduino.ser, "none")
                     
         else: # interaction = 2, so i'm starting the interaction loop
@@ -530,14 +528,13 @@ def run_demo(args):
                             print("INTERACTION LOOP - Child is far and in front ")
                             functions_main.send_uno_lights(arduino.ser1, "move")
                             functions_main.send_initial_action_arduino("move", arduino.ser, "move_find")
-                            functions_main.send_uno_lights(arduino.ser1, "none")
                         elif angle > 10:
                             print("INTERACTION LOOP - Child is on the right ")
-                            functions_main.send_uno_lights(arduino.ser1, "none")
+                            functions_main.send_uno_lights(arduino.ser1, "rotateRight")
                             functions_main.send_initial_action_arduino("rotateRight", arduino.ser, "none")
                         elif angle < -10:
                             print("INTERACTION LOOP - Child is on the left ")
-                            functions_main.send_uno_lights(arduino.ser1, "none")
+                            functions_main.send_uno_lights(arduino.ser1, "rotateLeft")
                             functions_main.send_initial_action_arduino("rotateLeft", arduino.ser, "none")
                 elif arduino.new_dist < 40.0:
                     tooCloseCount += 1
@@ -561,14 +558,12 @@ def run_demo(args):
                         if firstTime:
                                 functions_main.send_uno_lights(arduino.ser1,"excited_attract")
                                 functions_main.send_initial_action_arduino("excited_attract", arduino.ser, "excited_attract")
-                                functions_main.send_uno_lights(arduino.ser1,"none")
                                 firstTime = False
                         if receiveAction:                                        
                             if child_action != "joint":
                                 functions_main.decide_action(child_action) #decide robot behaviour based on action of the child and movement of the robot
                                 functions_main.send_uno_lights(arduino.ser1, functions_main.current_action)
                                 functions_main.send_initial_action_arduino( functions_main.current_action, arduino.ser, functions_main.current_action)
-                                functions_main.send_uno_lights(arduino.ser1, "none")
                                 receiveAction = False
                             else:
                                 JointAttention = True
@@ -613,7 +608,6 @@ def run_demo(args):
                     Finding_human = False
                     functions_main.send_uno_lights(arduino.ser1, "excited_attract")
                     functions_main.send_initial_action_arduino("excited_attract", arduino.ser, "excited_attract")
-                    functions_main.send_uno_lights(arduino.ser1, "none")
                     time_out_system_hum = 0   
                     time_out_system = 0                     
                 else:
