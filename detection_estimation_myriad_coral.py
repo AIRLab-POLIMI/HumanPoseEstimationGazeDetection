@@ -102,13 +102,12 @@ def draw_on_img(img, centr, res, uncertainty): #gaze drawing
     angle = -math.degrees(math.atan2(res[1],res[0]))
 
     norm1 = res / np.linalg.norm(res)
-    norm1[0] *= img.shape[0]*0.10
-    norm1[1] *= img.shape[0]*0.10
+    norm1[0] *= img.shape[0]#*0.10
+    norm1[1] *= img.shape[0]#*0.10
     
     point = centr + norm1 
 
-    result = cv2.arrowedLine(img, (int(centr[0]),int(centr[1])), (int(point[0]),int(point[1])), (0,0,0), thickness=3, tipLength=0.2)
-    result = cv2.arrowedLine(result, (int(centr[0]),int(centr[1])), (int(point[0]),int(point[1])), (0,0,255), thickness=2, tipLength=0.2)
+    result = cv2.arrowedLine(img, (int(centr[0]),int(centr[1])), (int(point[0]),int(point[1])), (0,0,255), thickness=2, tipLength=0.1)
     result = cv2.putText(result, " Gaze Uncertainty {:.3f}".format(uncertainty), (10,450), cv2.FONT_HERSHEY_SIMPLEX ,0.5, (0,255,0),1)    
     result = cv2.putText(result, " Gaze Angle {:.3f}".format(angle), (10,470), cv2.FONT_HERSHEY_SIMPLEX ,0.5, (0,255,0),1)
     return result
@@ -130,7 +129,7 @@ def elaborate_gaze(img, head, score, model_gaze):
     featMap = np.reshape(featMap,(1,10))
     confMap = np.reshape(confMap,(1,5))
     centr = np.asarray(centroid)
-    centr = np.reshape(centr,(1,2))			
+    centr = np.reshape(centr,(1,2))
     poseFeats = np.concatenate((centr, featMap, confMap), axis=1)
     data =[]
     data.append(poseFeats)

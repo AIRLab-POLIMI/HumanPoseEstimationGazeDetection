@@ -151,13 +151,12 @@ def draw_on_img(img, centr, res, uncertainty): #gaze drawing
     angle = -math.degrees(math.atan2(res[1],res[0]))
 
     norm1 = res / np.linalg.norm(res)
-    norm1[0] *= img.shape[0]*0.10
-    norm1[1] *= img.shape[0]*0.10
+    norm1[0] *= img.shape[0]
+    norm1[1] *= img.shape[0]
     
     point = centr + norm1 
 
-    result = cv2.arrowedLine(img, (int(centr[0]),int(centr[1])), (int(point[0]),int(point[1])), (0,0,0), thickness=3, tipLength=0.2)
-    result = cv2.arrowedLine(result, (int(centr[0]),int(centr[1])), (int(point[0]),int(point[1])), (0,0,255), thickness=2, tipLength=0.2)
+    result = cv2.arrowedLine(img, (int(centr[0]),int(centr[1])), (int(point[0]),int(point[1])), (0,0,255), thickness=2, tipLength=0.1)
     result = cv2.putText(result, " Gaze Uncertainty {:.3f}".format(uncertainty), (10,450), cv2.FONT_HERSHEY_SIMPLEX ,0.5, (0,255,0),1)    
     result = cv2.putText(result, " Gaze Angle {:.3f}".format(angle), (10,470), cv2.FONT_HERSHEY_SIMPLEX ,0.5, (0,255,0),1)
     return result
@@ -190,11 +189,8 @@ def elaborate_gaze(img, head, score, model_gaze):
     gazeDirections = pred_[0,:-1]
     Uncertainties = np.exp(pred_[0,-1])
     Centroids = ld[0,0:2]
-    if args.no_show:
-        return pred_
-    else:
-        result = draw_on_img(img, Centroids, gazeDirections, Uncertainties)
-        return result, pred_
+   
+    return Centroids, gazeDirections, Uncertainties
     
 def elaborate_pose(result, threshold=0.7):  #the order of the first keypoints is given in pose_engine.py (var list KEYPOINTS)
     i=0
@@ -355,6 +351,7 @@ def run_demo(args):
     print("#----- Loading Posenet - Coral Inference -----#")
     devices = edgetpu_utils.ListEdgeTpuPaths(edgetpu_utils.EDGE_TPU_STATE_UNASSIGNED)
     engine = PoseEngine(args.model_hpe, devices[0])
+    res = []
     print("#-----Done-----#")
     
     #Mobilenet - NCS2 Inference
@@ -406,11 +403,9 @@ def run_demo(args):
     start_time_JA = 0
     duration_JA = 0
     actual_time_JA = 0
-    count_find = 0
     
     #Camera Thread
     vs = WebcamVideoStream(camera_width, camera_height, src=0).start()
-    #datas = dataStream().start()
     
     functions_main.send_uno_lights(arduino.ser1,"none") 
     
@@ -418,6 +413,7 @@ def run_demo(args):
         
         t1 = time.perf_counter()
         frame = vs.read()
+        frame = cv2.resize(frame, (model_width, model_height))
                 
         arduino.new_user_function()
         
@@ -444,8 +440,32 @@ def run_demo(args):
                     
         #interaction = 0 or interaction=1 is when the system is trying to estabilish an interaction with the child
         #interaction = 2 is when the robot is already interacting with the human
+        
+        if JointAttention:
+            time_out_system_hum = 0
+            actual_time_JA = time.time()
+            duration_JA = duration_JA + (actual_time_JA - start_time_JA)
+            start_time_JA = actual_time_JA
+            print("Joint Attention Task")
+            print("Time elapsed: {:.1f}".format(duration_JA))
+            prep_image = frame[:, :, ::-1].copy() 
+            res, inference_time = engine.DetectPosesInImage(prep_image)      
+            if res:
+                head, scores_head = elaborate_pose(res)
+                centroids, gazeDirections, uncertainties = elaborate_gaze(frame, head, scores_head, model_gaze)
+                gazeDirections[0] *= frame.shape[0] # X
+                gazeDirections[1] *= frame.shape[1] # Y
+                angle = -math.degrees(math.atan2(gazeDirections[1],gazeDirections[0]))
+                norm1 = gazeDirections / np.linalg.norm(gazeDirections)
+                norm1[0] *= frame.shape[0]
+                norm1[1] *= frame.shape[0]
+                point = centroids + norm1
+                cv2.arrowedLine(frame, (int(centroids[0]),int(centroids[1])), (int(point[0]),int(point[1])), (0,0,255), thickness=2, tipLength=0.1)
+                cv2.putText(frame, " Gaze Uncertainty {:.3f}".format(uncertainties), (10,450), cv2.FONT_HERSHEY_SIMPLEX ,0.5, (0,255,0),1)    
+                cv2.putText(frame, " Gaze Angle {:.3f}".format(angle), (10,470), cv2.FONT_HERSHEY_SIMPLEX ,0.5, (0,255,0),1)
+                                      
                     
-        if interaction != 2 : #If I'm not interacting with the human
+        if interaction != 2 and not JointAttention: #If I'm not interacting with the human
             print("Interaction != 2, I'm not interacting with the human")
             if arduino.old_user != "none": #if an object is detected by the sonar, check if it is a human
                 print("Object detected by sonars")                              
@@ -506,7 +526,7 @@ def run_demo(args):
                     functions_main.send_uno_lights(arduino.ser1, "rotateRight")
                     functions_main.send_initial_action_arduino("rotateRight", arduino.ser, "none")
                     
-        else: # interaction = 2, so i'm starting the interaction loop
+        elif interaction == 2 and not JointAttention: # interaction = 2, so i'm starting the interaction loop
             print("INTERACTION LOOP")
             if time_out_system_hum > TIME_OUT_HUM: #If there is no human for too long
                 print("INTERACTION LOOP - I've lost contact with the human")
@@ -569,26 +589,6 @@ def run_demo(args):
                                 JointAttention = True
                                 start_time_JA = time.time()
                                 duration_JA = 0
-                        if JointAttention and duration_JA < JA_TIME:
-                            actual_time_JA = time.time()
-                            duration_JA = duration_JA + (actual_time_JA - start_time_JA)
-                            print("Measuring Joint attention")
-                            functions_main.send_uno_lights(arduino.ser1, "happy")
-                            frame = cv2.resize(frame, (model_width, model_height))
-                            frame = frame[:, :, ::-1].copy() 
-                            res, inference_time = engine.DetectPosesInImage(frame)
-                            if res:
-                                head, scores_head = elaborate_pose(res)
-                                prediction = elaborate_gaze(frame, head, scores_head, model_gaze)
-                                print("Gaze versor: {}".format(prediction[0,:-1]))
-                                print("Time: {}".format(duration_JA))
-                        elif duration_JA >= JA_TIME:
-                            functions_main.send_uno_lights(arduino.ser1, "happy")
-                            functions_main.send_initial_action_arduino("excited", arduino.ser, "excited")
-                            start_time_JA = 0
-                            duration_JA = 0
-                            actual_time_JA = 0
-                            JointAttention = False
                     else: #if no human
                         if previousAngle > 0 and angle == 0: lookTo = "rotateRight"
                         elif previousAngle < 0 and angle == 0: lookTo = "rotateLeft"
@@ -640,7 +640,7 @@ def run_demo(args):
                 cv2.putText(frame, labels[labels_detected[i].astype(int)], (bbox[0]+3,bbox[1]-7), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255,255,255))
         i+=1
         
-        cv2.putText(frame, "FPS: {:.1f}".format(float(fps)), (5,20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255,255,255), 1)
+        cv2.putText(frame, "FPS: {:.1f}".format(float(fps)), (5,20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255,255,255), 1)            
         cv2.imshow('Demo', frame)
         
         key = cv2.waitKey(1)            
