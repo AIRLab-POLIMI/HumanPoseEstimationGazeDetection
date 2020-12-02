@@ -457,8 +457,8 @@ def run_demo(args):
                 gazeDirections[1] *= frame.shape[1] # Y
                 angle = -math.degrees(math.atan2(gazeDirections[1],gazeDirections[0]))
                 norm1 = gazeDirections / np.linalg.norm(gazeDirections)
-                norm1[0] *= frame.shape[0]
-                norm1[1] *= frame.shape[0]
+                norm1[0] *= frame.shape[0]*0.10
+                norm1[1] *= frame.shape[0]*0.10
                 point = centroids + norm1
                 cv2.arrowedLine(frame, (int(centroids[0]),int(centroids[1])), (int(point[0]),int(point[1])), (0,0,255), thickness=2, tipLength=0.1)
                 cv2.putText(frame, " Gaze Uncertainty {:.3f}".format(uncertainties), (10,450), cv2.FONT_HERSHEY_SIMPLEX ,0.5, (0,255,0),1)    
@@ -638,9 +638,10 @@ def run_demo(args):
             cv2.rectangle(frame, (bbox[0], bbox[1]), (bbox[0] + bbox[2], bbox[1] + bbox[3]), (0, 0, 255), 1)
             if len(labels_detected)>0:
                 cv2.putText(frame, labels[labels_detected[i].astype(int)], (bbox[0]+3,bbox[1]-7), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255,255,255))
-        i+=1
+            i+=1 #indent at the same level of if
         
-        cv2.putText(frame, "FPS: {:.1f}".format(float(fps)), (5,20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255,255,255), 1)            
+        cv2.putText(frame, "FPS: {:.1f}".format(float(fps)), (5,20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255,255,255), 1)
+    
         cv2.imshow('Demo', frame)
         
         key = cv2.waitKey(1)            

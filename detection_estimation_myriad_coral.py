@@ -102,15 +102,18 @@ def draw_on_img(img, centr, res, uncertainty): #gaze drawing
     angle = -math.degrees(math.atan2(res[1],res[0]))
 
     norm1 = res / np.linalg.norm(res)
-    norm1[0] *= img.shape[0]#*0.10
-    norm1[1] *= img.shape[0]#*0.10
+    norm1[0] *= img.shape[0]*0.30
+    norm1[1] *= img.shape[0]*0.30
     
     point = centr + norm1 
-
-    result = cv2.arrowedLine(img, (int(centr[0]),int(centr[1])), (int(point[0]),int(point[1])), (0,0,255), thickness=2, tipLength=0.1)
+    
+    if centr[0]!=0 and centr[1]!=0:
+        result = cv2.arrowedLine(img, (int(centr[0]),int(centr[1])), (int(point[0]),int(point[1])), (0,0,255), thickness=2, tipLength=0.1)
+    else:
+        result = cv2.circle(img, (0,0), 1, (0,0,0))
     result = cv2.putText(result, " Gaze Uncertainty {:.3f}".format(uncertainty), (10,450), cv2.FONT_HERSHEY_SIMPLEX ,0.5, (0,255,0),1)    
     result = cv2.putText(result, " Gaze Angle {:.3f}".format(angle), (10,470), cv2.FONT_HERSHEY_SIMPLEX ,0.5, (0,255,0),1)
-    return result
+    return result, angle
 
 def elaborate_gaze(img, head, score, model_gaze):
     centroid = compute_centroid(head)
@@ -143,8 +146,8 @@ def elaborate_gaze(img, head, score, model_gaze):
     if args.no_show:
         return pred_
     else:
-        result = draw_on_img(img, Centroids, gazeDirections, Uncertainties)
-        return result, pred_
+        result, angle = draw_on_img(img, Centroids, gazeDirections, Uncertainties)
+        return result, angle, Centroids, pred_
     
 def elaborate_pose(result, threshold=0.7):  #the order of the first keypoints is given in pose_engine.py (var list KEYPOINTS)
     i=0
@@ -311,6 +314,10 @@ def run_demo(args):
     #Camera Thread
     vs = WebcamVideoStream(camera_width, camera_height, src=0).start()
     
+    #Point of interest SIMULATED
+    testBox = [int(model_width*0.2), int(model_height*0.7), 130, 110]
+    verticesBox = [[testBox[0], testBox[1]], [testBox[0]+testBox[2], testBox[1]+testBox[3]], [testBox[0]+testBox[2], testBox[1]], [testBox[0], testBox[1]+testBox[3]]]
+    
     while True:
         
         child_state = ""
@@ -360,6 +367,8 @@ def run_demo(args):
         prepimg = color_image[:, :, ::-1].copy()         
         res, inference_time = engine.DetectPosesInImage(prepimg)
         
+        headCentroid = []
+        color = (255,0,0)
         if res:
             detectframecount += 1            
             head, scores_head = elaborate_pose(res)
@@ -368,10 +377,21 @@ def run_demo(args):
                 prediction = elaborate_gaze(imdraw, head, scores_head, model_gaze)
             else:
                 imdraw = overlay_on_image(color_image, res, model_width, model_height, main_person, args.modality)
-                imdraw, prediction = elaborate_gaze(imdraw, head, scores_head, model_gaze)
-                
+                imdraw, gazeAngle, headCentroid, prediction = elaborate_gaze(imdraw, head, scores_head, model_gaze)
+                targetAngleMax = -360
+                targetAngleMin = 360
+                for vertices in verticesBox:
+                    targetAngle= -math.degrees(math.atan2(vertices[1]-headCentroid[1],vertices[0]-headCentroid[0]))
+                    if targetAngle > targetAngleMax:
+                        targetAngleMax = targetAngle
+                    if targetAngle < targetAngleMin:
+                        targetAngleMin = targetAngle
+                print(targetAngleMin, targetAngleMax)
+                if gazeAngle > (targetAngleMin-10) and gazeAngle < (targetAngleMax+10):
+                    color = (0,255,0)
         else:
             imdraw = color_image
+            
                 
         i=0
         # FPS Calculation
@@ -399,9 +419,10 @@ def run_demo(args):
             cv2.rectangle(imdraw, (bbox[0], bbox[1]), (bbox[0] + bbox[2], bbox[1] + bbox[3]), (0, 0, 255), 1)
             if len(labels_detected)>0:
                 cv2.putText(imdraw, labels[labels_detected[i].astype(int)], (bbox[0]+3,bbox[1]-7), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255,255,255))
-        i+=1
+            i+=1 #indent at the same level of if
         
         cv2.putText(imdraw, display_fps, (5,20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255,255,255), 1)
+        cv2.rectangle(imdraw, (testBox[0], testBox[1]), (testBox[0] + testBox[2], testBox[1] + testBox[3]), color,1)
         cv2.imshow('Demo', imdraw)
         
             
