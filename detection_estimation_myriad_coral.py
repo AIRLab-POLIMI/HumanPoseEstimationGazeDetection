@@ -292,7 +292,7 @@ def run_demo(args):
     #Mobilenet - NCS2 Inference
     print("#-----Loading Mobilenet - NCS2 Inference -----#")
     ie = IECore()
-    detector_person = Detector(ie, path_to_model_xml=args.model_od, device=args.device, label_class=args.person_label)
+    detector_object = Detector(ie, path_to_model_xml=args.model_od, device=args.device, label_class=args.person_label)
     print("#-----Done-----#")
     
 
@@ -350,9 +350,10 @@ def run_demo(args):
         t1 = time.perf_counter()
 
         # Run Object Detection
-        bboxes, labels_detected, score_detected, bboxes_person = detector_person.detect(frame)
+        bboxes, labels_detected, score_detected, bboxes_person, bboxes_laptop = detector_object.detect(frame)
         
         main_person = [0,0,0,0]
+        main_laptop = [0,0,0,0]
         areas=[]
         for bbox in bboxes_person:
             area = bbox[2]*bbox[3]
@@ -360,6 +361,17 @@ def run_demo(args):
         if areas:
             box_person_num = areas.index(max(areas))
             main_person = [bboxes_person[box_person_num][0],bboxes_person[box_person_num][1],bboxes_person[box_person_num][2],bboxes_person[box_person_num][3]]
+        
+        areas = []
+        targetBox = []
+        for bbox in bboxes_laptop:
+            area = bbox[2]*bbox[3]
+            areas.append(area)
+        if areas:
+            box_laptop_num = areas.index(max(areas))
+            main_laptop = [bboxes_laptop[box_laptop_num][0], bboxes_laptop[box_laptop_num][1],bboxes_laptop[box_laptop_num][2],bboxes_laptop[box_laptop_num][3]]
+            targetBox = [[main_laptop[0], main_laptop[1]], [main_laptop[0]+main_laptop[2], main_laptop[1]+main_laptop[3]], [main_laptop[0]+main_laptop[2], main_laptop[1]], [main_laptop[0], main_laptop[1]+main_laptop[3]]]
+        
             
         # Run Pose + Gaze Estimation
         color_image = frame
@@ -368,7 +380,7 @@ def run_demo(args):
         res, inference_time = engine.DetectPosesInImage(prepimg)
         
         headCentroid = []
-        color = (255,0,0)
+        color = (0,0,255)
         if res:
             detectframecount += 1            
             head, scores_head = elaborate_pose(res)
@@ -380,15 +392,16 @@ def run_demo(args):
                 imdraw, gazeAngle, headCentroid, prediction = elaborate_gaze(imdraw, head, scores_head, model_gaze)
                 targetAngleMax = -360
                 targetAngleMin = 360
-                for vertices in verticesBox:
-                    targetAngle= -math.degrees(math.atan2(vertices[1]-headCentroid[1],vertices[0]-headCentroid[0]))
-                    if targetAngle > targetAngleMax:
-                        targetAngleMax = targetAngle
-                    if targetAngle < targetAngleMin:
-                        targetAngleMin = targetAngle
-                print(targetAngleMin, targetAngleMax)
-                if gazeAngle > (targetAngleMin-10) and gazeAngle < (targetAngleMax+10):
-                    color = (0,255,0)
+                if targetBox:
+                    for vertices in targetBox:
+                        targetAngle= -math.degrees(math.atan2(vertices[1]-headCentroid[1],vertices[0]-headCentroid[0]))
+                        if targetAngle > targetAngleMax:
+                            targetAngleMax = targetAngle
+                        if targetAngle < targetAngleMin:
+                            targetAngleMin = targetAngle
+                    #print(targetAngleMin, targetAngleMax)
+                    if gazeAngle > (targetAngleMin-10) and gazeAngle < (targetAngleMax+10):
+                        color = (0,255,0)
         else:
             imdraw = color_image
             
@@ -407,7 +420,7 @@ def run_demo(args):
         elapsedTime = t2-t1
         time1 += 1/elapsedTime
         time2 += elapsedTime
-        detection_fps = "Detection: {:.1f} FPS".format(float(1/detector_person.infer_time))
+        detection_fps = "Detection: {:.1f} FPS".format(float(1/detector_object.infer_time))
         display_fps = fps + estimation_fps + detection_fps
 
         if args.no_show:
@@ -416,13 +429,13 @@ def run_demo(args):
         
         #Visualization
         for bbox in bboxes:
-            cv2.rectangle(imdraw, (bbox[0], bbox[1]), (bbox[0] + bbox[2], bbox[1] + bbox[3]), (0, 0, 255), 1)
+            cv2.rectangle(imdraw, (bbox[0], bbox[1]), (bbox[0] + bbox[2], bbox[1] + bbox[3]), color, 1)
             if len(labels_detected)>0:
                 cv2.putText(imdraw, labels[labels_detected[i].astype(int)], (bbox[0]+3,bbox[1]-7), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255,255,255))
-            i+=1 #indent at the same level of if
+                i+=1 #indent at the same level of putTexts
         
         cv2.putText(imdraw, display_fps, (5,20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255,255,255), 1)
-        cv2.rectangle(imdraw, (testBox[0], testBox[1]), (testBox[0] + testBox[2], testBox[1] + testBox[3]), color,1)
+        #cv2.rectangle(imdraw, (testBox[0], testBox[1]), (testBox[0] + testBox[2], testBox[1] + testBox[3]), color,1)
         cv2.imshow('Demo', imdraw)
         
             

@@ -357,7 +357,7 @@ def run_demo(args):
     #Mobilenet - NCS2 Inference
     print("#-----Loading Mobilenet - NCS2 Inference -----#")
     ie = IECore()
-    detector_person = Detector(ie, path_to_model_xml=args.model_od, device=args.device, label_class=args.person_label)
+    detector_object = Detector(ie, path_to_model_xml=args.model_od, device=args.device, label_class=args.person_label)
     print("#-----Done-----#")
     
 
@@ -420,7 +420,7 @@ def run_demo(args):
    
         # Run Object Detection                
         previousAngle = angle
-        bboxes, labels_detected, score_detected, bboxes_person = detector_person.detect(frame)
+        bboxes, labels_detected, score_detected, bboxes_person = detector_object.detect(frame)
         main_person = [0,0,0,0]
         areas=[]
         for bbox in bboxes_person:
@@ -638,7 +638,7 @@ def run_demo(args):
             cv2.rectangle(frame, (bbox[0], bbox[1]), (bbox[0] + bbox[2], bbox[1] + bbox[3]), (0, 0, 255), 1)
             if len(labels_detected)>0:
                 cv2.putText(frame, labels[labels_detected[i].astype(int)], (bbox[0]+3,bbox[1]-7), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255,255,255))
-            i+=1 #indent at the same level of if
+                i+=1 #indent at the same level of putText
         
         cv2.putText(frame, "FPS: {:.1f}".format(float(fps)), (5,20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255,255,255), 1)
     
