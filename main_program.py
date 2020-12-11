@@ -151,15 +151,18 @@ def draw_on_img(img, centr, res, uncertainty): #gaze drawing
     angle = -math.degrees(math.atan2(res[1],res[0]))
 
     norm1 = res / np.linalg.norm(res)
-    norm1[0] *= img.shape[0]
-    norm1[1] *= img.shape[0]
+    norm1[0] *= img.shape[0]*0.30
+    norm1[1] *= img.shape[0]*0.30
     
     point = centr + norm1 
-
-    result = cv2.arrowedLine(img, (int(centr[0]),int(centr[1])), (int(point[0]),int(point[1])), (0,0,255), thickness=2, tipLength=0.1)
+    
+    if centr[0]!=0 and centr[1]!=0:
+        result = cv2.arrowedLine(img, (int(centr[0]),int(centr[1])), (int(point[0]),int(point[1])), (0,0,255), thickness=2, tipLength=0.1)
+    else:
+        result = cv2.circle(img, (0,0), 1, (0,0,0))
     result = cv2.putText(result, " Gaze Uncertainty {:.3f}".format(uncertainty), (10,450), cv2.FONT_HERSHEY_SIMPLEX ,0.5, (0,255,0),1)    
     result = cv2.putText(result, " Gaze Angle {:.3f}".format(angle), (10,470), cv2.FONT_HERSHEY_SIMPLEX ,0.5, (0,255,0),1)
-    return result
+    return result, angle
 
 def elaborate_gaze(img, head, score, model_gaze):
     centroid = compute_centroid(head)
@@ -178,7 +181,7 @@ def elaborate_gaze(img, head, score, model_gaze):
     featMap = np.reshape(featMap,(1,10))
     confMap = np.reshape(confMap,(1,5))
     centr = np.asarray(centroid)
-    centr = np.reshape(centr,(1,2))			
+    centr = np.reshape(centr,(1,2))
     poseFeats = np.concatenate((centr, featMap, confMap), axis=1)
     data =[]
     data.append(poseFeats)
@@ -189,8 +192,11 @@ def elaborate_gaze(img, head, score, model_gaze):
     gazeDirections = pred_[0,:-1]
     Uncertainties = np.exp(pred_[0,-1])
     Centroids = ld[0,0:2]
-   
-    return Centroids, gazeDirections, Uncertainties
+    if args.no_show:
+        return pred_
+    else:
+        result, angle = draw_on_img(img, Centroids, gazeDirections, Uncertainties)
+        return result, angle, Centroids, pred_
     
 def elaborate_pose(result, threshold=0.7):  #the order of the first keypoints is given in pose_engine.py (var list KEYPOINTS)
     i=0
@@ -226,6 +232,7 @@ def elaborate_pose(result, threshold=0.7):  #the order of the first keypoints is
     scores[2] = score["left eye"]    
     scores[3] = score["right ear"]
     scores[4] = score["left ear"]
+    ts = time.time()
 
     return head, scores
         
@@ -292,9 +299,9 @@ def dist_2D(p1, p2):
     squared_dist = np.sum((p1 - p2)**2, axis=0)
     return np.sqrt(squared_dist)
     
-def human_camera_angle(person, im_width):
-    xmin = person[0]
-    xmax = person[0] + person[2]
+def target_camera_angle(target, im_width):
+    xmin = target[0]
+    xmax = target[0] + target[2]
     centerx = xmin + ((xmax-xmin)/2)
     angle = (0.09375*centerx)-30
     return angle
@@ -403,6 +410,8 @@ def run_demo(args):
     start_time_JA = 0
     duration_JA = 0
     actual_time_JA = 0
+    toleranceFrame = 0
+    greetedTeddy = False
     
     #Camera Thread
     vs = WebcamVideoStream(camera_width, camera_height, src=0).start()
@@ -420,8 +429,10 @@ def run_demo(args):
    
         # Run Object Detection                
         previousAngle = angle
-        bboxes, labels_detected, score_detected, bboxes_person = detector_object.detect(frame)
+        
+        bboxes, labels_detected, score_detected, bboxes_person, bboxes_teddy = detector_object.detect(frame)        
         main_person = [0,0,0,0]
+        main_teddy = [0,0,0,0]
         areas=[]
         for bbox in bboxes_person:
             area = bbox[2]*bbox[3]
@@ -429,10 +440,23 @@ def run_demo(args):
         if areas:
             box_person_num = areas.index(max(areas))
             main_person = [bboxes_person[box_person_num][0],bboxes_person[box_person_num][1],bboxes_person[box_person_num][2],bboxes_person[box_person_num][3]]
-            angle = human_camera_angle(main_person, camera_width)
+            angle = target_camera_angle(main_person, camera_width)
         else:
             angle = 0
-                    
+            
+        areas = []
+        targetBox = []
+        for bbox in bboxes_teddy:
+            area = bbox[2]*bbox[3]
+            areas.append(area)
+        if areas:
+            box_teddy_num = areas.index(max(areas))
+            main_teddy = [bboxes_teddy[box_teddy_num][0], bboxes_teddy[box_teddy_num][1],bboxes_teddy[box_teddy_num][2],bboxes_teddy[box_teddy_num][3]]
+            angleTeddy = target_camera_angle(main_teddy, camera_width)
+            targetBox = [[main_teddy[0], main_teddy[1]], [main_teddy[0]+main_teddy[2], main_teddy[1]+main_teddy[3]], [main_teddy[0]+main_teddy[2], main_teddy[1]], [main_teddy[0], main_teddy[1]+main_teddy[3]]]
+        
+        else:
+            angleTeddy = 0
         ####-----START HUMAN INTERACTION-----####
         count = 0
         
@@ -448,22 +472,45 @@ def run_demo(args):
             start_time_JA = actual_time_JA
             print("Joint Attention Task")
             print("Time elapsed: {:.1f}".format(duration_JA))
-            prep_image = frame[:, :, ::-1].copy() 
-            res, inference_time = engine.DetectPosesInImage(prep_image)      
-            if res:
-                head, scores_head = elaborate_pose(res)
-                centroids, gazeDirections, uncertainties = elaborate_gaze(frame, head, scores_head, model_gaze)
-                gazeDirections[0] *= frame.shape[0] # X
-                gazeDirections[1] *= frame.shape[1] # Y
-                angle = -math.degrees(math.atan2(gazeDirections[1],gazeDirections[0]))
-                norm1 = gazeDirections / np.linalg.norm(gazeDirections)
-                norm1[0] *= frame.shape[0]*0.10
-                norm1[1] *= frame.shape[0]*0.10
-                point = centroids + norm1
-                cv2.arrowedLine(frame, (int(centroids[0]),int(centroids[1])), (int(point[0]),int(point[1])), (0,0,255), thickness=2, tipLength=0.1)
-                cv2.putText(frame, " Gaze Uncertainty {:.3f}".format(uncertainties), (10,450), cv2.FONT_HERSHEY_SIMPLEX ,0.5, (0,255,0),1)    
-                cv2.putText(frame, " Gaze Angle {:.3f}".format(angle), (10,470), cv2.FONT_HERSHEY_SIMPLEX ,0.5, (0,255,0),1)
-                                      
+            
+            if angleTeddy != 0: #there is a teddy in the FOV of robot
+                print("Teddy Bear in the FOV")
+                if (abs(angleTeddy)<=10): #the teddy is in front of the robot
+                    if arduino.new_dist < 80 and greetedTeddy == False :
+                        print("Inviting to play with the teddy...")
+                        functions_main.send_uno_lights(arduino.ser1, "excited_attract")
+                        functions_main.send_initial_action_arduino("backForth", arduino.ser, "happy")
+                        functions_main.send_initial_action_arduino("scared", arduino.ser, "none")
+                        greetedTeddy = True
+                    elif arduino.new_dist > 80 and greetedTeddy == False:
+                        print("Teddy too far, approaching...")
+                        functions_main.send_initial_action_arduino("move", arduino.ser, "none")
+                    elif greetedTeddy:
+                        prep_image = frame[:, :, ::-1].copy() 
+                        res, inference_time = engine.DetectPosesInImage(prep_image)      
+                        if res:
+                            head, scores_head = elaborate_pose(res)
+                            frame = overlay_on_image(frame, res, model_width, model_height, main_person, args.modality)
+                            frame, gazeAngle, headCentroid, prediction = elaborate_gaze(frame, head, scores_head, model_gaze)
+                elif angleTeddy >=10 and greetedTeddy == False:
+                        print("Adjusting right...")
+                        functions_main.send_uno_lights(arduino.ser1, "rotateRight")
+                        functions_main.send_initial_action_arduino("rotateRight", arduino.ser, "none")
+                elif angleTeddy <= -10 and greetedTeddy == False:
+                    print("Adjusting left...")
+                    functions_main.send_uno_lights(arduino.ser1, "rotateLeft")
+                    functions_main.send_initial_action_arduino("rotateLeft", arduino.ser, "none")
+            else: #if there is no Teddy Bear for a frame
+                toleranceFrame += 1
+                if toleranceFrame == 10: #if there actually is no teddy bear in the scene
+                    print("Searching for a Teddy Bear...")
+                    functions_main.send_uno_lights(arduino.ser1, "rotateRight")
+                    functions_main.send_initial_action_arduino("rotateRight", arduino.ser, "none")
+                    toleranceFrame = 0
+                
+
+        else:
+            duration_JA = 0
                     
         if interaction != 2 and not JointAttention: #If I'm not interacting with the human
             print("Interaction != 2, I'm not interacting with the human")
@@ -637,7 +684,8 @@ def run_demo(args):
         for bbox in bboxes:
             cv2.rectangle(frame, (bbox[0], bbox[1]), (bbox[0] + bbox[2], bbox[1] + bbox[3]), (0, 0, 255), 1)
             if len(labels_detected)>0:
-                cv2.putText(frame, labels[labels_detected[i].astype(int)], (bbox[0]+3,bbox[1]-7), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255,255,255))
+                cv2.putText(frame, labels[labels_detected[i].astype(int)], (bbox[0]+3,bbox[1]-7), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255,255,255))                
+                cv2.putText(frame, "{:.3f}".format(score_detected[i]), (bbox[0]+3,bbox[1]+7), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255,255,255))
                 i+=1 #indent at the same level of putText
         
         cv2.putText(frame, "FPS: {:.1f}".format(float(fps)), (5,20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255,255,255), 1)

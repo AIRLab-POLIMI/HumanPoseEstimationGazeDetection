@@ -175,6 +175,7 @@ void loop() {
   else if (movement == "excited_attract") sideStrafes();
   else if (movement == "interested_excited") smallRotations();
   else if (movement == "happy") bigRotations();
+  else if (movement == "backForth") backForth();
   else{
     virhas.stop();
     movement = " ";
@@ -343,6 +344,45 @@ void sideStrafes(){
       moving = true;
       motion.strafe = 0.8*i;
       motion.forward = 0;
+      motion.angular = 0;
+      virhas.run2(motion.strafe*_MAX_SPEED, motion.forward*_MAX_SPEED, motion.angular*_MAX_ANGULAR);
+      virhas.PIDLoop();
+  }
+  virhas.stop();
+  movement = " ";
+  moving = false;    
+}
+
+void backForth(){
+  int i = 1;
+  while(abs(virhas.getPosX()) < 1.25){
+      moving = true;
+      motion.strafe = 0;
+      motion.forward = 0.8*i;
+      motion.angular = 0;
+      virhas.run2(motion.strafe*_MAX_SPEED, motion.forward*_MAX_SPEED, motion.angular*_MAX_ANGULAR);
+      virhas.PIDLoop();
+  }
+  virhas.stop();
+  while(numberAction < 7){ // KEEP THIS ODD
+    i = i*(-1);
+    while(abs(virhas.getPosX()) < 2.5){
+      moving = true;
+      motion.strafe = 0;
+      motion.forward = 0.8*i;
+      motion.angular = 0;
+      virhas.run2(motion.strafe*_MAX_SPEED, motion.forward*_MAX_SPEED, motion.angular*_MAX_ANGULAR);
+      virhas.PIDLoop();
+    }
+    numberAction++; 
+    virhas.stop();
+  }
+  virhas.stop();
+  i = 1; 
+  while(abs(virhas.getPosX()) < 1.25){
+      moving = true;
+      motion.strafe = 0;
+      motion.forward = 0.8*i;
       motion.angular = 0;
       virhas.run2(motion.strafe*_MAX_SPEED, motion.forward*_MAX_SPEED, motion.angular*_MAX_ANGULAR);
       virhas.PIDLoop();

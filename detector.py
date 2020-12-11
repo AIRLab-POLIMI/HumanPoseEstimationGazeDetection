@@ -11,7 +11,7 @@ log = logging.getLogger()
 
 
 class Detector(object):
-    def __init__(self, ie, path_to_model_xml, device, label_class, scale=None, thr=0.60):
+    def __init__(self, ie, path_to_model_xml, device, label_class, scale=None, thr=0.30):
         self.OUTPUT_SIZE = 7
         self.CHANNELS_SIZE = 3
         self.model = ie.read_network(path_to_model_xml, os.path.splitext(path_to_model_xml)[0] + '.bin')
@@ -75,13 +75,13 @@ class Detector(object):
         bboxes_new = [coord_translation(bbox[3:]) for bbox in bboxes if bbox[2] > self._thr]       
         labels_detected = [bbox[1] for bbox in bboxes if bbox[2] > self._thr]        
         score_detected = [bbox[2] for bbox in bboxes if bbox[2] > self._thr]
-        bboxes_person = [coord_translation(bbox[3:]) for bbox in bboxes if bbox[1] == 1 and bbox[2] > self._thr] # 1 = person
-        bboxes_laptop = [coord_translation(bbox[3:]) for bbox in bboxes if bbox[1] == 73 and bbox[2] > self._thr] # 73 = laptop
+        bboxes_person = [coord_translation(bbox[3:]) for bbox in bboxes if bbox[1] == 1 and bbox[2] > 0.6] # 1 = person over 0.6 thr
+        bboxes_teddy = [coord_translation(bbox[3:]) for bbox in bboxes if (bbox[1] == 88 or bbox[1] == 18) and bbox[2] > self._thr] # 88 = teddy bear 18 = dog
 
-        return bboxes_new, labels_detected, score_detected, bboxes_person, bboxes_laptop
+        return bboxes_new, labels_detected, score_detected, bboxes_person, bboxes_teddy
 
     def detect(self, img):
         img = self._preprocess(img)
         output = self._infer(img)
-        bboxes, labels_detected, score_detected, bboxes_person, bboxes_laptop = self._postprocess(output[self._output_layer_name][0][0])
-        return bboxes, labels_detected, score_detected, bboxes_person, bboxes_laptop
+        bboxes, labels_detected, score_detected, bboxes_person, bboxes_teddy = self._postprocess(output[self._output_layer_name][0][0])
+        return bboxes, labels_detected, score_detected, bboxes_person, bboxes_teddy
