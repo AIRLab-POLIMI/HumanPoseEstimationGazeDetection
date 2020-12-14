@@ -106,10 +106,20 @@ def on_press(key):
         print("{0} Pressed".format(key.char))        
         if key.char == ("a"):
             child_action = "touch"
+            if JointAttention:
+                if duration_JA != 0:
+                    data = str(duration_JA) + ',' + str(duration_LOOKING) + '\n'
+                    with open('prova.csv','w') as fp:
+                        fp.write(data)
             JointAttention = False
             receiveAction = True
         elif key.char == ("s"):
             child_action = "push"
+            if JointAttention:
+                if duration_JA != 0:
+                    data = str(duration_JA) + ',' + str(duration_LOOKING) + '\n'
+                    with open('prova.csv','w') as fp:
+                        fp.write(data)
             JointAttention = False
             receiveAction = True
         elif key.char == ("d"):
@@ -379,7 +389,7 @@ def run_demo(args):
     
     #Human Interaction variables
     TIME_OUT = 40 # How much time do i have if i'm searching a human during the interaction loop?
-    TIME_OUT_HUM = 15 # How much time can I stay without human?
+    TIME_OUT_HUM = 10 # How much time can I stay without human?
     JA_TIME = 30 #duration of JA task analisys
     child_action_prec = "none"
     tracking_a_user = False #is the obstacle i read from sonar an human?
@@ -410,8 +420,15 @@ def run_demo(args):
     start_time_JA = 0
     duration_JA = 0
     actual_time_JA = 0
+    
+    start_time_LOOKING = 0 
+    duration_LOOKING = 0
+    actual_time_LOOKING = 0
+    
     toleranceFrame = 0
     greetedTeddy = False
+    oldTargetBox = []
+    targetBox = []
     
     #Camera Thread
     vs = WebcamVideoStream(camera_width, camera_height, src=0).start()
@@ -423,9 +440,9 @@ def run_demo(args):
         t1 = time.perf_counter()
         frame = vs.read()
         frame = cv2.resize(frame, (model_width, model_height))
+        color = (0, 0, 255)
                 
-        arduino.new_user_function()
-        
+        arduino.new_user_function()        
    
         # Run Object Detection                
         previousAngle = angle
@@ -445,7 +462,7 @@ def run_demo(args):
             angle = 0
             
         areas = []
-        targetBox = []
+        
         for bbox in bboxes_teddy:
             area = bbox[2]*bbox[3]
             areas.append(area)
@@ -457,6 +474,7 @@ def run_demo(args):
         
         else:
             angleTeddy = 0
+            
         ####-----START HUMAN INTERACTION-----####
         count = 0
         
@@ -467,50 +485,70 @@ def run_demo(args):
         
         if JointAttention:
             time_out_system_hum = 0
-            actual_time_JA = time.time()
-            duration_JA = duration_JA + (actual_time_JA - start_time_JA)
-            start_time_JA = actual_time_JA
-            print("Joint Attention Task")
-            print("Time elapsed: {:.1f}".format(duration_JA))
-            
-            if angleTeddy != 0: #there is a teddy in the FOV of robot
+            print("Joint Attention Task")        
+            if angleTeddy != 0 and greetedTeddy == False: #there is a teddy in the FOV of robot
                 print("Teddy Bear in the FOV")
                 if (abs(angleTeddy)<=10): #the teddy is in front of the robot
-                    if arduino.new_dist < 80 and greetedTeddy == False :
+                    if arduino.new_dist < 80:
                         print("Inviting to play with the teddy...")
                         functions_main.send_uno_lights(arduino.ser1, "excited_attract")
                         functions_main.send_initial_action_arduino("backForth", arduino.ser, "happy")
                         functions_main.send_initial_action_arduino("scared", arduino.ser, "none")
                         greetedTeddy = True
-                    elif arduino.new_dist > 80 and greetedTeddy == False:
+                        start_time_LOOKING = time.time()
+                    elif arduino.new_dist > 80:
                         print("Teddy too far, approaching...")
                         functions_main.send_initial_action_arduino("move", arduino.ser, "none")
-                    elif greetedTeddy:
-                        prep_image = frame[:, :, ::-1].copy() 
-                        res, inference_time = engine.DetectPosesInImage(prep_image)      
-                        if res:
-                            head, scores_head = elaborate_pose(res)
-                            frame = overlay_on_image(frame, res, model_width, model_height, main_person, args.modality)
-                            frame, gazeAngle, headCentroid, prediction = elaborate_gaze(frame, head, scores_head, model_gaze)
-                elif angleTeddy >=10 and greetedTeddy == False:
+                elif angleTeddy >=10:
                         print("Adjusting right...")
                         functions_main.send_uno_lights(arduino.ser1, "rotateRight")
                         functions_main.send_initial_action_arduino("rotateRight", arduino.ser, "none")
-                elif angleTeddy <= -10 and greetedTeddy == False:
+                elif angleTeddy <= -10:
                     print("Adjusting left...")
                     functions_main.send_uno_lights(arduino.ser1, "rotateLeft")
                     functions_main.send_initial_action_arduino("rotateLeft", arduino.ser, "none")
-            else: #if there is no Teddy Bear for a frame
+            elif targetBox == oldTargetBox: #if there is no Teddy Bear identified for a frame
                 toleranceFrame += 1
-                if toleranceFrame == 10: #if there actually is no teddy bear in the scene
+                if toleranceFrame == 10 and greetedTeddy == False: #if there actually is no teddy bear in the scene
                     print("Searching for a Teddy Bear...")
                     functions_main.send_uno_lights(arduino.ser1, "rotateRight")
                     functions_main.send_initial_action_arduino("rotateRight", arduino.ser, "none")
                     toleranceFrame = 0
-                
-
+                elif toleranceFrame == 20 and greetedTeddy:
+                    #Task Completed (?)
+                    toleranceFrame = 0
+                    
+            if greetedTeddy:
+                #I pretend that it did not spontaneously went out of the scene, so I can assume that Teddy is still on position
+                actual_time_JA = time.time()
+                duration_JA = duration_JA + (actual_time_JA - start_time_JA)
+                start_time_JA = actual_time_JA
+                print("Time JA: {:.1f}".format(duration_JA))
+                prep_image = frame[:, :, ::-1].copy() 
+                res, inference_time = engine.DetectPosesInImage(prep_image)      
+                if res:
+                    head, scores_head = elaborate_pose(res)
+                    frame = overlay_on_image(frame, res, model_width, model_height, main_person, args.modality)
+                    frame, gazeAngle, headCentroid, prediction = elaborate_gaze(frame, head, scores_head, model_gaze)
+                    targetAngleMax = -360
+                    targetAngleMin = 360
+                    if targetBox:
+                        for vertices in targetBox:
+                            targetAngle= -math.degrees(math.atan2(vertices[1]-headCentroid[1],vertices[0]-headCentroid[0]))
+                            if targetAngle > targetAngleMax:
+                                targetAngleMax = targetAngle
+                            if targetAngle < targetAngleMin:
+                                targetAngleMin = targetAngle
+                        #print(targetAngleMin, targetAngleMax)
+                        if gazeAngle > (targetAngleMin-5) and gazeAngle < (targetAngleMax+5):
+                            color = (0,255,0)
+                            actual_time_LOOKING = time.time()
+                            duration_LOOKING = duration_LOOKING + abs(actual_time_LOOKING - start_time_JA)
+                            start_time_LOOKING = actual_time_LOOKING
+                print("Time spent looking at the teddy: {:.1f}".format(duration_LOOKING))
         else:
             duration_JA = 0
+            duration_LOOKING = 0
                     
         if interaction != 2 and not JointAttention: #If I'm not interacting with the human
             print("Interaction != 2, I'm not interacting with the human")
@@ -640,7 +678,7 @@ def run_demo(args):
                         if previousAngle > 0 and angle == 0: lookTo = "rotateRight"
                         elif previousAngle < 0 and angle == 0: lookTo = "rotateLeft"
                     print("Child Action: " + child_action + " | " + "Robot Action: " + functions_main.current_action)
-                print("Time Out Human {:.1f} / 15 Sec".format(time_out_system_hum) )
+                print("Time Out Human {:.1f} / 10 Sec".format(time_out_system_hum) )
             elif Finding_human == True and time_out_system < TIME_OUT : #if i need to find the child and i'm inside the timout
                 print("INTERACTION LOOP - Looking for a human")
                 #I need to find the human. I start counting for the general TIME_OUT
@@ -667,6 +705,8 @@ def run_demo(args):
                 
         ####-----END HUMAN INTERACTION----####
         
+        oldTargetBox = targetBox.copy()
+        
         t2 = time.perf_counter()  
         elapsedTime = t2-t1      
         fps = 1/elapsedTime      
@@ -682,7 +722,7 @@ def run_demo(args):
         
         #visualization
         for bbox in bboxes:
-            cv2.rectangle(frame, (bbox[0], bbox[1]), (bbox[0] + bbox[2], bbox[1] + bbox[3]), (0, 0, 255), 1)
+            cv2.rectangle(frame, (bbox[0], bbox[1]), (bbox[0] + bbox[2], bbox[1] + bbox[3]), color, 1)
             if len(labels_detected)>0:
                 cv2.putText(frame, labels[labels_detected[i].astype(int)], (bbox[0]+3,bbox[1]-7), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255,255,255))                
                 cv2.putText(frame, "{:.3f}".format(score_detected[i]), (bbox[0]+3,bbox[1]+7), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255,255,255))
@@ -694,6 +734,10 @@ def run_demo(args):
         
         key = cv2.waitKey(1)            
         if key == 27:
+            if duration_JA != 0:
+                data = str(duration_JA) + ',' + str(duration_LOOKING)
+                with open('prova.csv','a') as fp:
+                    fp.write(data)
             break
         
     vs.stop()
