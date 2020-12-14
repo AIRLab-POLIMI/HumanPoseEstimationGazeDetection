@@ -106,20 +106,10 @@ def on_press(key):
         print("{0} Pressed".format(key.char))        
         if key.char == ("a"):
             child_action = "touch"
-            if JointAttention:
-                if duration_JA != 0:
-                    data = str(duration_JA) + ',' + str(duration_LOOKING) + '\n'
-                    with open('prova.csv','w') as fp:
-                        fp.write(data)
             JointAttention = False
             receiveAction = True
         elif key.char == ("s"):
             child_action = "push"
-            if JointAttention:
-                if duration_JA != 0:
-                    data = str(duration_JA) + ',' + str(duration_LOOKING) + '\n'
-                    with open('prova.csv','w') as fp:
-                        fp.write(data)
             JointAttention = False
             receiveAction = True
         elif key.char == ("d"):
@@ -530,16 +520,23 @@ def run_demo(args):
                     head, scores_head = elaborate_pose(res)
                     frame = overlay_on_image(frame, res, model_width, model_height, main_person, args.modality)
                     frame, gazeAngle, headCentroid, prediction = elaborate_gaze(frame, head, scores_head, model_gaze)
+                    if gazeAngle < 0: gazeAngle = 360 + gazeAngle
                     targetAngleMax = -360
                     targetAngleMin = 360
                     if targetBox:
                         for vertices in targetBox:
-                            targetAngle= -math.degrees(math.atan2(vertices[1]-headCentroid[1],vertices[0]-headCentroid[0]))
+                            targetAngle=-math.degrees(math.atan2(vertices[1]-headCentroid[1],vertices[0]-headCentroid[0]))
+                            cv2.line(frame, (vertices[0],vertices[1]), (int(headCentroid[0]), int(headCentroid[1])), (255,255,255), 1)
                             if targetAngle > targetAngleMax:
                                 targetAngleMax = targetAngle
+                                print("update max")
                             if targetAngle < targetAngleMin:
                                 targetAngleMin = targetAngle
-                        #print(targetAngleMin, targetAngleMax)
+                                print("update min")
+                        if targetAngleMax < 0: targetAngleMax = 360 + targetAngleMax
+                        if targetAngleMin < 0: targetAngleMin = 360 + targetAngleMin
+                        print(targetAngleMin, targetAngleMax)
+                        print(gazeAngle)
                         if gazeAngle > (targetAngleMin-5) and gazeAngle < (targetAngleMax+5):
                             color = (0,255,0)
                             actual_time_LOOKING = time.time()
