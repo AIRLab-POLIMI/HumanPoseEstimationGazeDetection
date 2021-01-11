@@ -249,6 +249,13 @@ def dist_2D(p1, p2):
 
     squared_dist = np.sum((p1 - p2)**2, axis=0)
     return np.sqrt(squared_dist)
+    
+def target_camera_angle(target, im_width):
+    xmin = target[0]
+    xmax = target[0] + target[2]
+    centerx = xmin + ((xmax-xmin)/2)
+    angle = (0.09375*centerx)-30
+    return angle
 
 
 def run_demo(args):
@@ -361,7 +368,7 @@ def run_demo(args):
         if areas:
             box_person_num = areas.index(max(areas))
             main_person = [bboxes_person[box_person_num][0],bboxes_person[box_person_num][1],bboxes_person[box_person_num][2],bboxes_person[box_person_num][3]]
-            angle = human_camera_angle(main_person, camera_width)
+            angle = target_camera_angle(main_person, camera_width)
         else:
             angle = 0
             
@@ -396,15 +403,21 @@ def run_demo(args):
                 targetAngleMax = -360
                 targetAngleMin = 360
                 if targetBox:
-                    for vertices in targetBox:
-                        targetAngle= -math.degrees(math.atan2(vertices[1]-headCentroid[1],vertices[0]-headCentroid[0]))
-                        if targetAngle > targetAngleMax:
-                            targetAngleMax = targetAngle
-                        if targetAngle < targetAngleMin:
-                            targetAngleMin = targetAngle
-                    #print(targetAngleMin, targetAngleMax)
-                    if gazeAngle > (targetAngleMin-10) and gazeAngle < (targetAngleMax+10):
-                        color = (0,255,0)
+                        for vertices in targetBox:
+                            targetAngle=-math.degrees(math.atan2(vertices[1]-headCentroid[1],vertices[0]-headCentroid[0]))
+                            cv2.line(frame, (vertices[0],vertices[1]), (int(headCentroid[0]), int(headCentroid[1])), (255,255,255), 1)
+                            if targetAngle > targetAngleMax:
+                                targetAngleMax = targetAngle
+                                print("update max")
+                            if targetAngle < targetAngleMin:
+                                targetAngleMin = targetAngle
+                                print("update min")
+                        if targetAngleMax < 0: targetAngleMax = 360 + targetAngleMax
+                        if targetAngleMin < 0: targetAngleMin = 360 + targetAngleMin
+                        print(targetAngleMin, targetAngleMax)
+                        print(gazeAngle)
+                        if gazeAngle > (targetAngleMin-5) and gazeAngle < (targetAngleMax+5):
+                            color = (0,255,0)
         else:
             imdraw = color_image
             

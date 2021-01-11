@@ -418,10 +418,6 @@ def run_demo(args):
     duration_LOOKING = 0
     actual_time_LOOKING = 0
     
-    start_time_TOLERANCE = 0 
-    duration_TOLERANCE = 0
-    actual_time_TOLERANCE = 0
-    
     toleranceFrame = 0
     greetedTeddy = False
     oldTargetBox = []
@@ -482,7 +478,6 @@ def run_demo(args):
         
         if JointAttention:
             time_out_system_hum = 0
-            actual_time_TOLERANCE = time.time()
             print("Joint Attention Task")        
             if angleTeddy != 0 and greetedTeddy == False: #there is a teddy in the FOV of robot
                 print("Teddy Bear in the FOV")
@@ -492,7 +487,6 @@ def run_demo(args):
                         functions_main.send_uno_lights(arduino.ser1, "excited_attract")
                         functions_main.send_initial_action_arduino("backForth", arduino.ser, "happy")
                         functions_main.send_initial_action_arduino("scared", arduino.ser, "none")
-                        functions_main.send_uno_lights(arduino.ser1, "none")
                         greetedTeddy = True
                         start_time_LOOKING = time.time()
                     elif arduino.new_dist > 80:
@@ -513,18 +507,9 @@ def run_demo(args):
                     functions_main.send_uno_lights(arduino.ser1, "rotateRight")
                     functions_main.send_initial_action_arduino("rotateRight", arduino.ser, "none")
                     toleranceFrame = 0
-                duration_TOLERANCE = duration_TOLERANCE + abs(actual_time_TOLERANCE - start_time_TOLERANCE)
-                if duration_TOLERANCE >= 5 and greetedTeddy:
+                elif toleranceFrame == 20 and greetedTeddy:
                     #Task Completed (?)
-                    functions_main.send_uno_lights(arduino.ser1, "happy")
-                    functions_main.send_initial_action_arduino("happy", arduino.ser, "happy")
-                    duration_LOOKING = duration_LOOKING-duration_TOLERANCE
-                    duration_TOLERANCE = 0
-                    JointAttention = False
-                    child_action = "hug" #Interested Interacting state
-            else:
-                 duration_TOLERANCE = 0
-            start_time_TOLERANCE = actual_time_TOLERANCE
+                    toleranceFrame = 0
                     
             if greetedTeddy:
                 #I pretend that it did not spontaneously went out of the scene, so I can assume that Teddy is still on position
@@ -562,13 +547,12 @@ def run_demo(args):
                             duration_LOOKING = duration_LOOKING + abs(actual_time_LOOKING - start_time_LOOKING)
                         start_time_LOOKING = actual_time_LOOKING
                 print("Time spent looking at the teddy: {:.1f}".format(duration_LOOKING))
-                print("Time without teddy in the frame: {:.1f}".format(duration_TOLERANCE))
         else:
             if duration_JA != 0 and duration_LOOKING != 0:
                 now = datetime.now()
                 dt_string = now.strftime("%d/%m/%y %H:%M:%S")
                 data = dt_string + ',' + str(duration_JA) + ',' + str(duration_LOOKING) + '\n'
-                with open('records.csv','a') as fp:
+                with open('experiment_records.csv','a') as fp:
                     print("Record stored successfully")
                     fp.write(data)   
             duration_JA = 0
@@ -739,12 +723,11 @@ def run_demo(args):
             continue
                 
         if child_action == "QUIT":
-            functions_main.send_uno_lights(arduino.ser1, "none")
             if duration_JA != 0 and duration_LOOKING != 0:
                 now = datetime.now()
                 dt_string = now.strftime("%d/%m/%y %H:%M:%S")
                 data = dt_string + ',' + str(duration_JA) + ',' + str(duration_LOOKING) + '\n'
-                with open('records.csv','a') as fp:
+                with open('experiment_records.csv','a') as fp:
                     print("Record stored successfully")
                     fp.write(data)  
             break
@@ -763,12 +746,11 @@ def run_demo(args):
         
         key = cv2.waitKey(1)            
         if key == 27:
-            functions_main.send_uno_lights(arduino.ser1, "none")
             if duration_JA != 0 and duration_LOOKING != 0:
                 now = datetime.now()
                 dt_string = now.strftime("%d/%m/%y %H:%M:%S")
                 data = dt_string + ',' + str(duration_JA) + ',' + str(duration_LOOKING) + '\n'
-                with open('records.csv','a') as fp:
+                with open('experiment_records.csv','a') as fp:
                     print("Record stored successfully")
                     fp.write(data)  
             break
