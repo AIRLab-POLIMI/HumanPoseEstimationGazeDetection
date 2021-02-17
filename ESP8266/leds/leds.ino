@@ -65,6 +65,10 @@ void loop() {
     colorWipe(strip.Color(  0, 255, 255), 10); // Cyan
   if(action == "angry")
     colorWipe(strip.Color(  255,   0, 0), 10);//red
+  if(action == "lookRight")
+    colorWipe(strip.Color(  255,   255, 0), 10);// Yellow
+  if(action == "lookLeft")
+    colorWipe(strip.Color(255,   0, 255), 10); // Magenta
   if (action ==  "none" )
     turn_off();
 }
