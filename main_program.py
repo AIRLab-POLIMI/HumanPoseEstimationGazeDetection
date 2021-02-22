@@ -104,6 +104,7 @@ def on_press(key):
     global child_action
     global JointAttention
     global receiveAction
+    global TaskCompleted
     try:
         print("{0} Pressed".format(key.char))        
         if key.char == ("a"):
@@ -134,6 +135,8 @@ def on_press(key):
             child_action = "joint"
             JointAttention = False
             receiveAction = True
+        elif key.char == ("k"):
+            TaskCompleted = True
         else:
             child_action = child_action
     except AttributeError:
@@ -310,8 +313,9 @@ def target_camera_angle(target, im_width):
     return angle
 
 
-child_action = " "
+child_action = "touch"
 JointAttention = False
+TaskCompleted = False
 receiveAction = False
 breakFromKey = False
 listener = keyboard.Listener(on_press = on_press, on_release = on_release)
@@ -390,6 +394,7 @@ def run_demo(args):
     global receiveAction
     global JointAttention
     global child_action
+    global TaskCompleted
     firstTime = True
     lookTo = ""
     previousAngle = 0
@@ -423,6 +428,7 @@ def run_demo(args):
     actual_time_TOLERANCE = 0
     
     
+    lastTeddy = "rotateRight"
     countRotations = 0
     toleranceFrame = 0
     greetedTeddy = False
@@ -491,51 +497,62 @@ def run_demo(args):
             print("Joint Attention Task")        
             if angleTeddy != 0 and greetedTeddy == False: #there is a teddy in the FOV of robot
                 print("Teddy Bear in the FOV")
-                if (abs(angleTeddy)<=10): #the teddy is in front of the robot
-                    if arduino.new_dist <= 80:
+                if (abs(angleTeddy)<=15): #the teddy is in front of the robot
+                    if arduino.new_dist <= 80 and arduino.new_dist >= 20:
                         print("Inviting to play with the teddy...")
-                        welcomeAction = 1#randint(0,2)
-                        if welcomeAction == 0:
-                            functions_main.send_uno_lights(arduino.ser1, "excited_attract")                        
+                        welcomeAction = 0#randint(0,2)
+                        if welcomeAction == 0:                        
                             functions_main.send_initial_action_arduino("backForthRotation", arduino.ser, "happy")
+                            functions_main.send_uno_lights(arduino.ser1, "excited_attract")
+                            time.sleep(7)
+                            functions_main.send_initial_action_arduino("scared", arduino.ser, "none")
                         elif welcomeAction == 1:
-                            if countRotations > 6:
+                            if countRotations > 12:
                                 functions_main.send_initial_action_arduino("rotateForJointRight", arduino.ser, "found")
                                 functions_main.send_uno_lights(arduino.ser1, "lookRight") # Yellow
-                                time.sleep(4)
+                                time.sleep(7)
+                                functions_main.send_initial_action_arduino("scared", arduino.ser, "none")
                             else:
                                 functions_main.send_initial_action_arduino("rotateForJointLeft", arduino.ser, "found")
                                 functions_main.send_uno_lights(arduino.ser1, "lookLeft") # Magenta
-                                time.sleep(4)
+                                time.sleep(7)
+                                functions_main.send_initial_action_arduino("scared", arduino.ser, "none")
                         elif welcomeAction == 2:
-                            print("Welcome Action n° 2")                        
-                        functions_main.send_initial_action_arduino("scared", arduino.ser, "none")
+                            functions_main.send_initial_action_arduino("archsAround", arduino.ser, "excited")
+                            functions_main.send_uno_lights(arduino.ser1, "excited_attract")      
+                            time.sleep(6)
                         functions_main.send_uno_lights(arduino.ser1, "none")
                         countRotations = 0
                         greetedTeddy = True
                         start_time_LOOKING = time.time()
+                        if angleTeddy < 0:
+                            lastTeddy = "rotateLeft"
+                        else: angleTeddy = "rotateRight"
                     elif arduino.new_dist > 80:
                         print("Teddy too far, approaching...")
                         functions_main.send_initial_action_arduino("move", arduino.ser, "none")
-                elif angleTeddy >=10:
-                        print("Adjusting right...")
-                        functions_main.send_uno_lights(arduino.ser1, "rotateRight")
-                        functions_main.send_initial_action_arduino("rotateRight", arduino.ser, "none")
-                elif angleTeddy <= -10:
-                    print("Adjusting left...")
-                    functions_main.send_uno_lights(arduino.ser1, "rotateLeft")
-                    functions_main.send_initial_action_arduino("rotateLeft", arduino.ser, "none")
-            elif targetBox == oldTargetBox: #if there is no Teddy Bear identified for a frame
-                toleranceFrame += 1
-                if toleranceFrame == 10 and greetedTeddy == False: #if there actually is no teddy bear in the scene
-                    print("Searching for a Teddy Bear...")
+                    elif arduino.new_dist < 20:
+                        print("Too close, moving away...")
+                        functions_main.sent_initial_action_arduino("scared", arduino.ser, "none")
+                    duration_TOLERANCE = 0
+                elif angleTeddy >=15:
+                    print("Adjusting right...")
                     functions_main.send_uno_lights(arduino.ser1, "rotateRight")
                     functions_main.send_initial_action_arduino("rotateRight", arduino.ser, "none")
+                    duration_TOLERANCE = 0
+                elif angleTeddy <= -15:
+                    print("Adjusting left...")
+                    functions_main.send_uno_lights(arduino.ser1, "rotateRight")
+                    functions_main.send_initial_action_arduino("rotateLeft", arduino.ser, "none")
+                    duration_TOLERANCE = 0
+            elif targetBox == oldTargetBox: #if there is no Teddy Bear identified for a frame
+                if greetedTeddy == False: #if there actually is no teddy bear in the scene
+                    print("Searching for a Teddy Bear...")
+                    functions_main.send_uno_lights(arduino.ser1, "rotateRight")
+                    functions_main.send_initial_action_arduino(lastTeddy, arduino.ser, "none")
                     countRotations += 1
-                    toleranceFrame = 0
                 duration_TOLERANCE = duration_TOLERANCE + abs(actual_time_TOLERANCE - start_time_TOLERANCE)
-                #Task Completed (?)
-                if duration_TOLERANCE >= 10 and greetedTeddy:
+                if TaskCompleted and greetedTeddy:
                     functions_main.send_uno_lights(arduino.ser1, "happy")
                     functions_main.send_initial_action_arduino("happy", arduino.ser, "happy")
                     time.sleep(4)
@@ -544,7 +561,6 @@ def run_demo(args):
                     JointAttention = False
                     child_action = "hug" #Interested Interacting state
                     greetedTeddy = False
-                    toleranceFrame = 0
                     countRotations = 0
                     
             else:
@@ -556,6 +572,7 @@ def run_demo(args):
                 actual_time_JA = time.time()
                 duration_JA = duration_JA + (actual_time_JA - start_time_JA)
                 start_time_JA = actual_time_JA
+                actual_time_TOLERANCE = time.time()
                 print("Time JA: {:.1f}".format(duration_JA))
                 prep_image = frame[:, :, ::-1].copy() 
                 res, inference_time = engine.DetectPosesInImage(prep_image)      
@@ -573,14 +590,10 @@ def run_demo(args):
                             cv2.line(frame, (vertices[0],vertices[1]), (int(headCentroid[0]), int(headCentroid[1])), (255,255,255), 1)
                             if targetAngle > targetAngleMax:
                                 targetAngleMax = targetAngle
-                                print("update max")
                             if targetAngle < targetAngleMin:
                                 targetAngleMin = targetAngle
-                                print("update min")
                         if targetAngleMax < 0: targetAngleMax = 360 + targetAngleMax
                         if targetAngleMin < 0: targetAngleMin = 360 + targetAngleMin
-                        print(targetAngleMin, targetAngleMax)
-                        print(gazeAngle)
                         actual_time_LOOKING = time.time()
                         if gazeAngle > (targetAngleMin-5) and gazeAngle < (targetAngleMax+5):
                             color = (0,255,0)
@@ -751,6 +764,7 @@ def run_demo(args):
             elif Finding_human == True and time_out_system>TIME_OUT: #If 'm looking for the children and i run out of time
                 print("Terminating the program")
                 child_action = "QUIT"
+            TaskCompleted = False 
                 
         ####-----END HUMAN INTERACTION----####
         

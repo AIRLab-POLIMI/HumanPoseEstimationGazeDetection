@@ -305,7 +305,7 @@ void backward(float speed){ // circa 40 cm backward at i speed
 
 void rotate(int i){ // i is the direction of rotation
   
-  while(abs(virhas.getPosTh()) < (PI/6)){
+  while(abs(virhas.getPosTh()) < (PI/12)){
     moving = true;
     motion.strafe = 0;
     motion.forward = 0;
