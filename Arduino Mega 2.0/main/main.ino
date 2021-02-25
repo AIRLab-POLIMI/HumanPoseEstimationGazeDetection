@@ -180,6 +180,8 @@ void loop() {
   else if (movement == "rotateForJointRight") rotateForJoint(1);
   else if (movement == "rotateForJointLeft") rotateForJoint(-1);
   else if (movement == "archsAround") archsAround();
+  else if (movement == "openToRight") openTo(1);
+  else if (movement == "openToLeft") openTo(-1);
   else{
     virhas.stop();
     movement = " ";
@@ -353,6 +355,7 @@ void sideStrafes(){
       virhas.PIDLoop();
   }
   virhas.stop();
+  numberAction = 0;
   movement = " ";
   moving = false;    
 }
@@ -392,7 +395,7 @@ void backForth(){
       virhas.PIDLoop();
   }
   virhas.stop();
-  
+  numberAction = 0;  
   movement = " ";
   moving = false;    
 }
@@ -475,7 +478,7 @@ void bigRotations(){
   moving = false;    
 }
 
-void backForthRotation(){
+void backForthRotation(){  
   int i = 1;
   while(abs(virhas.getPosX()) < 1.25){
       moving = true;
@@ -511,24 +514,68 @@ void backForthRotation(){
   }
   virhas.stop();  
   numberAction = 0;
-  bigRotations();
+  while(abs(virhas.getPosTh()) < 2*PI){
+      moving = true;
+      motion.strafe = 0;
+      motion.forward = 0;
+      motion.angular = 0.5*i;
+      virhas.run2(motion.strafe*_MAX_SPEED, motion.forward*_MAX_SPEED, motion.angular*_MAX_ANGULAR);
+      virhas.PIDLoop();
+  }
+  virhas.stop();
+  while(abs(virhas.getPosX()) < 1.25){
+      moving = true;
+      motion.strafe = 0;
+      motion.forward = 0.8*i;
+      motion.angular = 0;
+      virhas.run2(motion.strafe*_MAX_SPEED, motion.forward*_MAX_SPEED, motion.angular*_MAX_ANGULAR);
+      virhas.PIDLoop();
+  }
+  virhas.stop();
+  while(numberAction < 7){ // KEEP THIS ODD
+    i = i*(-1);
+    while(abs(virhas.getPosX()) < 2.5){
+      moving = true;
+      motion.strafe = 0;
+      motion.forward = 0.8*i;
+      motion.angular = 0;
+      virhas.run2(motion.strafe*_MAX_SPEED, motion.forward*_MAX_SPEED, motion.angular*_MAX_ANGULAR);
+      virhas.PIDLoop();
+    }
+    numberAction++; 
+    virhas.stop();
+  }
+  virhas.stop();
+  i = 1; 
+  while(abs(virhas.getPosX()) < 1.25){
+      moving = true;
+      motion.strafe = 0;
+      motion.forward = 0.8*i;
+      motion.angular = 0;
+      virhas.run2(motion.strafe*_MAX_SPEED, motion.forward*_MAX_SPEED, motion.angular*_MAX_ANGULAR);
+      virhas.PIDLoop();
+  }
+  virhas.stop();  
+  numberAction = 0;
   movement = " ";
   moving = false;    
 }
 
-void rotateForJoint(int i){ // i is the direction of rotation
-  for(int j=0; j<6; j++){
+void rotateForJoint(int d){ // d is the direction of rotation
+  backForth();
+  for(int j=0; j<2; j++){
     while(abs(virhas.getPosTh()) < (PI*0.6)){
       moving = true;
       motion.strafe = 0;
       motion.forward = 0;
-      motion.angular = i*0.8;
+      motion.angular = d*0.8;
       virhas.run2(motion.strafe*_MAX_SPEED, motion.forward*_MAX_SPEED, motion.angular*_MAX_ANGULAR);
       virhas.PIDLoop();
     }
     virhas.stop();
-    delay(500);
-    i = i*(-1);
+    d = d*(-1);
+    if(j%2 == 1) backForth();
+    else sideStrafes();
   }
   movement = " ";
   moving = false;
@@ -538,40 +585,97 @@ void rotateForJoint(int i){ // i is the direction of rotation
 void archsAround(){
   while(abs(virhas.getPosTh()) < PI/6){
       moving = true;
-      motion.strafe = 0.5;
-      motion.forward = (1-cos(PI/6));
-      motion.angular = 0.083;
+      motion.strafe = 0.8;
+      motion.forward = (1-cos(PI/6))*1.5;
+      motion.angular = 0.5;
       virhas.run2(motion.strafe*_MAX_SPEED, motion.forward*_MAX_SPEED, motion.angular*_MAX_ANGULAR);
       virhas.PIDLoop();
   }
   virhas.stop();
   while(abs(virhas.getPosTh()) < PI/6){
       moving = true;
-      motion.strafe = -0.5;
-      motion.forward = -(1-cos(PI/6));
-      motion.angular = -0.083;
+      motion.strafe = -0.8;
+      motion.forward = -(1-cos(PI/6))*1.5;
+      motion.angular = -0.5;
       virhas.run2(motion.strafe*_MAX_SPEED, motion.forward*_MAX_SPEED, motion.angular*_MAX_ANGULAR);
       virhas.PIDLoop();
   }
   virhas.stop();
   while(abs(virhas.getPosTh()) < PI/6){
       moving = true;
-      motion.strafe = -0.5;
-      motion.forward = (1-cos(PI/6));
-      motion.angular = -0.083;
+      motion.strafe = -0.8;
+      motion.forward = (1-cos(PI/6))*1.5;
+      motion.angular = -0.5;
       virhas.run2(motion.strafe*_MAX_SPEED, motion.forward*_MAX_SPEED, motion.angular*_MAX_ANGULAR);
       virhas.PIDLoop();
   }
   virhas.stop();
   while(abs(virhas.getPosTh()) < PI/6){
       moving = true;
-      motion.strafe = 0.5;
-      motion.forward = -(1-cos(PI/6));
-      motion.angular = 0.083;
+      motion.strafe = 0.8;
+      motion.forward = -(1-cos(PI/6))*1.5;
+      motion.angular = 0.5;
+      virhas.run2(motion.strafe*_MAX_SPEED, motion.forward*_MAX_SPEED, motion.angular*_MAX_ANGULAR);
+      virhas.PIDLoop();
+  }
+  virhas.stop();
+  while(abs(virhas.getPosTh()) < PI/6){
+      moving = true;
+      motion.strafe = 0.8;
+      motion.forward = (1-cos(PI/6))*1.5;
+      motion.angular = 0.5;
+      virhas.run2(motion.strafe*_MAX_SPEED, motion.forward*_MAX_SPEED, motion.angular*_MAX_ANGULAR);
+      virhas.PIDLoop();
+  }
+  virhas.stop();
+  while(abs(virhas.getPosTh()) < PI/6){
+      moving = true;
+      motion.strafe = -0.8;
+      motion.forward = -(1-cos(PI/6))*1.5;
+      motion.angular = -0.5;
+      virhas.run2(motion.strafe*_MAX_SPEED, motion.forward*_MAX_SPEED, motion.angular*_MAX_ANGULAR);
+      virhas.PIDLoop();
+  }
+  virhas.stop();
+  while(abs(virhas.getPosTh()) < PI/6){
+      moving = true;
+      motion.strafe = -0.8;
+      motion.forward = (1-cos(PI/6))*1.5;
+      motion.angular = -0.5;
+      virhas.run2(motion.strafe*_MAX_SPEED, motion.forward*_MAX_SPEED, motion.angular*_MAX_ANGULAR);
+      virhas.PIDLoop();
+  }
+  virhas.stop();
+  while(abs(virhas.getPosTh()) < PI/6){
+      moving = true;
+      motion.strafe = 0.8;
+      motion.forward = -(1-cos(PI/6))*1.5;
+      motion.angular = 0.5;
       virhas.run2(motion.strafe*_MAX_SPEED, motion.forward*_MAX_SPEED, motion.angular*_MAX_ANGULAR);
       virhas.PIDLoop();
   }
   virhas.stop();
   movement = " ";
   moving = false;    
+}
+
+void openTo(int i){ // circa 40 cm backward at i speed
+  if(!backObstacle){
+    if(abs(virhas.getPosTh()) < PI/6){
+      moving = true;
+      motion.strafe = 0;
+      motion.forward = 0.5*(-1);
+      motion.angular = 0.1*i;
+      virhas.run2(motion.strafe*_MAX_SPEED, motion.forward*_MAX_SPEED, motion.angular*_MAX_ANGULAR);
+      virhas.PIDLoop();
+    }
+    else{
+      virhas.stop();
+      movement = " ";
+      moving = false;
+    }
+  }
+  else{
+    virhas.stop(); 
+  }
 }
