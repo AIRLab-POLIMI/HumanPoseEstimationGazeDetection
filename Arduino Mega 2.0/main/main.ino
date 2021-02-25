@@ -518,11 +518,11 @@ void backForthRotation(){
 
 void rotateForJoint(int i){ // i is the direction of rotation
   for(int j=0; j<6; j++){
-    while(abs(virhas.getPosTh()) < (PI/4)){
+    while(abs(virhas.getPosTh()) < (PI*0.6)){
       moving = true;
       motion.strafe = 0;
       motion.forward = 0;
-      motion.angular = i*0.6;
+      motion.angular = i*0.8;
       virhas.run2(motion.strafe*_MAX_SPEED, motion.forward*_MAX_SPEED, motion.angular*_MAX_ANGULAR);
       virhas.PIDLoop();
     }
