@@ -274,6 +274,8 @@ def run_demo(args):
     model_width   = 640
     model_height  = 480
     
+    AREA_MAX = 640*480
+    
     if args.model_od == "models/mobilenet-ssd.xml":
         labels = ['Background','Person','Car', 'Bus', 'Bicycle','Motorcycle'] #???
     elif args.model_od == "models/ssdlite_mobilenet_v2/FP16/ssdlite_mobilenet_v2.xml" or "models/ssdlite_mobilenet_v2/FP32/ssdlite_mobilenet_v2.xml" :
@@ -378,6 +380,8 @@ def run_demo(args):
             area = bbox[2]*bbox[3]
             areas.append(area)
         if areas:
+            areaTeddy = max(areas)
+            print("Rapporto Area Teddy / Area Max = {:.4f}".format(areaTeddy/AREA_MAX))
             box_teddy_num = areas.index(max(areas))
             main_teddy = [bboxes_teddy[box_teddy_num][0], bboxes_teddy[box_teddy_num][1],bboxes_teddy[box_teddy_num][2],bboxes_teddy[box_teddy_num][3]]
             targetBox = [[main_teddy[0], main_teddy[1]], [main_teddy[0]+main_teddy[2], main_teddy[1]+main_teddy[3]], [main_teddy[0]+main_teddy[2], main_teddy[1]], [main_teddy[0], main_teddy[1]+main_teddy[3]]]
@@ -420,6 +424,7 @@ def run_demo(args):
                             color = (0,255,0)
         else:
             imdraw = color_image
+        
             
                 
         i=0

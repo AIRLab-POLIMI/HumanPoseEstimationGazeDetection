@@ -514,7 +514,7 @@ void backForthRotation(){
   }
   virhas.stop();  
   numberAction = 0;
-  while(abs(virhas.getPosTh()) < 2*PI){
+  while(abs(virhas.getPosTh()) < 2.6*PI){
       moving = true;
       motion.strafe = 0;
       motion.forward = 0;
@@ -661,11 +661,11 @@ void archsAround(){
 
 void openTo(int i){ // circa 40 cm backward at i speed
   if(!backObstacle){
-    if(abs(virhas.getPosTh()) < PI/6){
+    if(abs(virhas.getPosX()) < 60){
       moving = true;
       motion.strafe = 0;
       motion.forward = 0.5*(-1);
-      motion.angular = 0.1*i;
+      motion.angular = 0.055*i;
       virhas.run2(motion.strafe*_MAX_SPEED, motion.forward*_MAX_SPEED, motion.angular*_MAX_ANGULAR);
       virhas.PIDLoop();
     }

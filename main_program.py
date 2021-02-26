@@ -6,6 +6,7 @@ import cv2
 import time
 import numpy as np
 import math
+import random
 
 from datetime import datetime
 from threading import Thread
@@ -344,6 +345,8 @@ def run_demo(args):
     model_width   = 640
     model_height  = 480
     
+    AREA_MAX = 640*480
+    
     #Loading labels based on the Object Detector model (different labels for different networks)
     if args.model_od == "models/mobilenet-ssd.xml":
         labels = ['Background','Person','Car', 'Bus', 'Bicycle','Motorcycle'] #???
@@ -386,7 +389,7 @@ def run_demo(args):
     
     #Human Interaction variables
     TIME_OUT = 40 # How much time do i have if i'm searching a human during the interaction loop?
-    TIME_OUT_HUM = 10 # How much time can I stay without human?
+    TIME_OUT_HUM = 5 # How much time can I stay without human?
     JA_TIME = 30 #duration of JA task analisys
     child_action_prec = "none"
     tracking_a_user = False #is the obstacle i read from sonar an human?
@@ -427,6 +430,7 @@ def run_demo(args):
     
     lastTeddy = "rotateRight"
     teddyInFrame = False
+    firstTimeTeddy = False
     countRotations = 0
     greetedTeddy = False
     oldTargetBox = []
@@ -473,6 +477,7 @@ def run_demo(args):
             areas.append(area)
         if areas:
             box_teddy_num = areas.index(max(areas))
+            areaTeddy = max(areas)
             main_teddy = [bboxes_teddy[box_teddy_num][0], bboxes_teddy[box_teddy_num][1],bboxes_teddy[box_teddy_num][2],bboxes_teddy[box_teddy_num][3]]
             angleTeddy = target_camera_angle(main_teddy, camera_width)
             targetBox = [[main_teddy[0], main_teddy[1]], [main_teddy[0]+main_teddy[2], main_teddy[1]+main_teddy[3]], [main_teddy[0]+main_teddy[2], main_teddy[1]], [main_teddy[0], main_teddy[1]+main_teddy[3]]]
@@ -494,44 +499,45 @@ def run_demo(args):
             print(arduino.new_dist)        
             if angleTeddy != 0 and greetedTeddy == False: #there is a teddy in the FOV of robot
                 print("Teddy Bear in the FOV")
+                if angleTeddy < 0:
+                    lastTeddy = "rotateLeft"
+                else: lastTeddy = "rotateRight"
+                if teddyInFrame == False:
+                    teddyInFrame == True
+                if not firstTimeTeddy:
+                    if countRotations > 13:
+                        functions_main.send_initial_action_arduino("rotateForJointRight", arduino.ser, "found")
+                        functions_main.send_uno_lights(arduino.ser1, "lookRight") # Yellow
+                        positionScene = "openToRight"
+                        time.sleep(7)
+                    else:
+                        functions_main.send_initial_action_arduino("rotateForJointLeft", arduino.ser, "found")
+                        functions_main.send_uno_lights(arduino.ser1, "lookLeft") # Magenta
+                        positionScene = "openToLeft"
+                        time.sleep(7) 
+                    firstTimeTeddy = True
                 if (abs(angleTeddy)<=20): #the teddy is in front of the robot
-                    if angleTeddy < 0:
-                            lastTeddy = "rotateLeft"
-                    else: angleTeddy = "rotateRight"
-                    if teddyInFrame == False:
-                        teddyInFrame == True
-                    if arduino.new_dist <= 90 and arduino.new_dist >= 30:
+                    if areaTeddy >= 0.3*AREA_MAX:
                         print("Inviting to play with the teddy...")
-                        welcomeAction = 2#randint(0,2)
+                        welcomeAction = random.randint(0,1)
                         if welcomeAction == 0:                        
                             functions_main.send_initial_action_arduino("backForthRotation", arduino.ser, "happy")
                             functions_main.send_uno_lights(arduino.ser1, "excited_attract")
-                            time.sleep(7)
-                            functions_main.send_initial_action_arduino("scared", arduino.ser, "none")
+                            time.sleep(8)
+                            functions_main.send_initial_action_arduino(positionScene, arduino.ser, "none")
                         elif welcomeAction == 1:
-                            if countRotations > 12:
-                                functions_main.send_initial_action_arduino("rotateForJointRight", arduino.ser, "found")
-                                functions_main.send_uno_lights(arduino.ser1, "lookRight") # Yellow
-                                time.sleep(7)
-                                functions_main.send_initial_action_arduino("scared", arduino.ser, "none")
-                            elif countRotations < 12:
-                                functions_main.send_initial_action_arduino("rotateForJointLeft", arduino.ser, "found")
-                                functions_main.send_uno_lights(arduino.ser1, "lookLeft") # Magenta
-                                time.sleep(7)
-                                functions_main.send_initial_action_arduino("scared", arduino.ser, "none")
-                        elif welcomeAction == 2:
                             functions_main.send_initial_action_arduino("archsAround", arduino.ser, "excited")
                             functions_main.send_uno_lights(arduino.ser1, "excited_attract")      
                             time.sleep(6)
-                            functions_main.send_initial_action_arduino("scared", arduino.ser, "none")
+                            functions_main.send_initial_action_arduino(positionScene, arduino.ser, "none")                            
                         functions_main.send_uno_lights(arduino.ser1, "none")
                         countRotations = 0
                         greetedTeddy = True
                         start_time_LOOKING = time.time()
-                    elif arduino.new_dist > 90:
+                    else:
                         print("Teddy too far, approaching...")
                         functions_main.send_initial_action_arduino("move", arduino.ser, "none")
-                    elif arduino.new_dist < 30:
+                    if arduino.new_dist < 30:
                         print("Too close, moving away...")
                         functions_main.sent_initial_action_arduino("scared", arduino.ser, "none")
                 elif angleTeddy >=20:
@@ -549,6 +555,9 @@ def run_demo(args):
                     functions_main.send_initial_action_arduino(lastTeddy, arduino.ser, "none")
                     if teddyInFrame == False:
                         countRotations += 1
+                        if countRotations == 24: countRotations = 0
+                        
+            print("N of rotation: {:.1f}".format(countRotations))
                                 
             if greetedTeddy:
                 #I pretend that it did not spontaneously went out of the scene, so I can assume that Teddy is still on position
@@ -587,6 +596,7 @@ def run_demo(args):
                     functions_main.send_initial_action_arduino("happy", arduino.ser, "happy")
                     time.sleep(4)
                     JointAttention = False
+                    TaskCompleted = False
                     child_action = "hug" #Interested Interacting state
                     greetedTeddy = False
                     countRotations = 0
@@ -728,7 +738,7 @@ def run_demo(args):
                         if previousAngle > 0 and angle == 0: lookTo = "rotateRight"
                         elif previousAngle < 0 and angle == 0: lookTo = "rotateLeft"
                     print("Child Action: " + child_action + " | " + "Robot Action: " + functions_main.current_action)
-                print("Time Out Human {:.1f} / 10 Sec".format(time_out_system_hum) )
+                print("Time Out Human {:.1f} / 5 Sec".format(time_out_system_hum) )
             elif Finding_human == True and time_out_system < TIME_OUT : #if i need to find the child and i'm inside the timout
                 print("INTERACTION LOOP - Looking for a human")
                 #I need to find the human. I start counting for the general TIME_OUT
