@@ -436,6 +436,12 @@ def run_demo(args):
     oldTargetBox = []
     targetBox = []
     
+    #File saving stuff
+    n_session = datetime.now()
+    n_session_str = n_session.strftime("%H:%M:%S")
+    fileWithAngles = 'JASession ' + n_session_str + '.csv'
+    
+    
     #Camera Thread
     vs = WebcamVideoStream(camera_width, camera_height, src=0).start()
     
@@ -590,6 +596,10 @@ def run_demo(args):
                             color = (0,255,0)
                             duration_LOOKING = duration_LOOKING + abs(actual_time_LOOKING - start_time_LOOKING)
                         start_time_LOOKING = actual_time_LOOKING
+                        with open(fileWithAngles,'a') as fp:
+                            hour = datetime.now()
+                            hour_string = hour.strftime("%H:%M:%S")
+                            fp.write(hour_string + ',' + str(targetAngleMin) + ',' + str(targetAngleMax) + ',' + str(gazeAngle) +'\n')
                 print("Time spent looking at the teddy: {:.1f}".format(duration_LOOKING))
                 if TaskCompleted:
                     functions_main.send_uno_lights(arduino.ser1, "happy")
