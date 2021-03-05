@@ -118,7 +118,7 @@ int count = 0;
 
 void setup() {
 
-  virhas.setKpid(2, 0.6, 0.7);
+  virhas.setKpid(2, 1, 0.7);
   virhas.stop();
   Serial.begin(115200);
   
@@ -664,9 +664,8 @@ void openTo(int i){
     if(abs(virhas.getPosX()) < 60){
       moving = true;
       motion.strafe = 0;
-      motion.forward = 0.5*(-1);
-      if(abs(virhas.getPosTh()) < PI/8) motion.angular = 0.09*i;
-      else motion.angular = 0;
+      motion.forward = 0.3*(-1);
+      motion.angular = 0.04*i;
       virhas.run2(motion.strafe*_MAX_SPEED, motion.forward*_MAX_SPEED, motion.angular*_MAX_ANGULAR);
       virhas.PIDLoop();
     }
@@ -678,5 +677,7 @@ void openTo(int i){
   }
   else{
     virhas.stop(); 
+    movement = " ";
+    moving = false;
   }
 }
