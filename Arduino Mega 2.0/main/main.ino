@@ -661,11 +661,11 @@ void archsAround(){
 
 void openTo(int i){
   if(!backObstacle){
-    if(abs(virhas.getPosX()) < 60){
+    if(abs(virhas.getPosTh()) < PI/6){
       moving = true;
       motion.strafe = 0;
-      motion.forward = 0.3*(-1);
-      motion.angular = 0.04*i;
+      motion.forward = 0.5*(-1);
+      motion.angular = 0.1*i;
       virhas.run2(motion.strafe*_MAX_SPEED, motion.forward*_MAX_SPEED, motion.angular*_MAX_ANGULAR);
       virhas.PIDLoop();
     }
