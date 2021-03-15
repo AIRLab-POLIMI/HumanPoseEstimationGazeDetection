@@ -438,7 +438,7 @@ def run_demo(args):
     
     #File saving stuff
     n_session = datetime.now()
-    n_session_str = n_session.strftime("%H:%M:%S")
+    n_session_str = n_session.strftime("%H_%M_%S")
     fileWithAngles = 'JASession ' + n_session_str + '.csv'
     
     
