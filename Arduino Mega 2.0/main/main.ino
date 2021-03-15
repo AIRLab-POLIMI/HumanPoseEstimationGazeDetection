@@ -115,6 +115,7 @@ bool start = true;
 bool moving = false;
 int movingCode = 0;
 int count = 0;
+bool firstMovement = true;
 
 void setup() {
 
@@ -660,24 +661,41 @@ void archsAround(){
 }
 
 void openTo(int i){
-  if(!backObstacle){
-    if(abs(virhas.getPosTh()) < PI/6){
-      moving = true;
-      motion.strafe = 0;
-      motion.forward = 0.5*(-1);
-      motion.angular = 0.1*i;
-      virhas.run2(motion.strafe*_MAX_SPEED, motion.forward*_MAX_SPEED, motion.angular*_MAX_ANGULAR);
-      virhas.PIDLoop();
+  if(firstMovement){
+    while(abs(virhas.getPosTh()) < PI/2){
+        moving = true;
+        motion.strafe = 0;
+        motion.forward = 0;
+        motion.angular = 0.3*i;
+        virhas.run2(motion.strafe*_MAX_SPEED, motion.forward*_MAX_SPEED, motion.angular*_MAX_ANGULAR);
+        virhas.PIDLoop();
     }
-    else{
-      virhas.stop();
-      movement = " ";
-      moving = false;
-    }
+    firstMovement = false;
+    virhas.stop();
+    delay(3000);
   }
   else{
-    virhas.stop(); 
-    movement = " ";
-    moving = false;
+    if(!backObstacle){
+      if(abs(virhas.getPosX()) < 90){
+        moving = true;
+        motion.strafe = 0.15*i*(-1);
+        motion.forward = 0.5*(-1);
+        motion.angular = 0.04*i*(-1);
+        virhas.run2(motion.strafe*_MAX_SPEED, motion.forward*_MAX_SPEED, motion.angular*_MAX_ANGULAR);
+        virhas.PIDLoop();
+      }
+      else{
+        virhas.stop();
+        movement = " ";
+        moving = false;
+        firstMovement = true;
+      }
+    }
+    else{
+      virhas.stop(); 
+      movement = " ";
+      moving = false;
+      firstMovement = true;
+    }
   }
 }
