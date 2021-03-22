@@ -5,52 +5,20 @@ In order to run the Gaze Estimation model it is needed at least Tensorflow 2.2. 
 
 In order to be sure that everything works fine, connect the USB HUB with NCS2 and Google Coral only after the boot of the Raspberry.
 
-Running the applications with the `-h` option yields the following usage messages:
-
 # detection_estimation_myriad_coral.py
 
 This is the debug script for visualization and extraction of information from all the models that are running simultaneously.
-It always makes available the theorical istantaneous FPS for Object Detection and for Pose Estimation + Gaze Estimation
+It always makes available the theorical istantaneous FPS for Object Detection and for Pose Estimation + Gaze Estimation. Arguments can be ignored.
 
-```
-usage: detect_estimation_myriad_coral.py [-h] [-m_od MODEL_OD]
-                                            [-m_hpe MODEL_HPE]
-                                            [-i INPUT]
-                                            [-d DEVICE]
-                                            [--person_label PERSON_LABEL]
-                                            [--modality]
-                                            [--no_show]
-
-optional arguments:
-
-  -h, --help            show this help message and exit
-  -m_od MODEL_OD, --model_od MODEL_OD
-                        path to model of object detector in xml format, inferenced by NCS2. Default is ssdlite_mobilenet_v2
-                        trained on COCO, precision FP16
-  -m_hpe MODEL_HPE, --model_hpe MODEL_HPE
-                        path to model of human pose estimator in tflite format, inferenced by Coral TPU.                      
-  -i INPUT [INPUT ...], --input INPUT [INPUT ...] 
-                        Set by default to 0, meaning PiCamera. Other videos are not compatible due to ffmpeg incompatibilities
-  -d DEVICE, --device DEVICE
-                        Set by default to MYRIAD. It specify where to perform inference for Object detection model
-  --person_label PERSON_LABEL
-                        Label of class person for detector and depends by the net. For mobilenet-ssd.xml and ssdlite_mobilenet_v2 is 1.
-                        It is needed to extract only the boundaries of "person" entity
-  --modality            Set by default to "Multi". It specify if I only want to visualize all the estimations from the main person (the biggest box
-                        among the person's boxes) or if I want to visualize every skeleton+gaze available in the FOV.
-  --no_show             Optional. Do not display visual output, only text with fps performance.
-  
-```
 # main_program.py
 
-This is the script that actually implement all the control loop designed for the behavior of the robot. See the informations above about arguments.
+This is the script that actually implement all the control loop designed for the behavior of the robot. Arguments can be ignored.
 
 During the script, if you are in the INTERACTION LOOP, you can simulate the actions that the child could do with the robot.
 
-Press: 'a' -> Touch, 's' -> push, 'd' -> hit, 'f' -> hug, 'g' -> strongHug, 'h' -> none, 'j' -> JointAttention.
+Press: 'a' -> Touch, 's' -> push, 'd' -> hit, 'f' -> hug, 'g' -> strongHug, 'h' -> none, 'j' -> JointAttention ('k' -> end JA program)
 
-The first action that is sent is a bit buggy, so you should press a couple of times. JointAttention state is under development, but it correctly
-extract the data from the gaze estimation models.
+The first action that is sent won't be recognized, so press twice.
 
 ## detector.py
 
@@ -70,13 +38,11 @@ It creates model and manages the weights of the net that is run locally on Raspb
 
 ## functions_main.py
 
-Credits to Ane San Martin.
 It manages all the functions that involve the communication with Arduino (outward) and the functions that manages the
 correct response based on the previous action of the child. Also sounds are managed here.
 
 ## connections_arduinos.py
 
-Credits to Ane San Martin.
 It manages the initialization of the communication between both Arduino Uno/Mega and Raspberry. Also manages all the
 inward communication from sonars of the Mega and its status: position of the obstacle (left, front, right), distance, movement 
 of the robot (forward, backward, stopped)
