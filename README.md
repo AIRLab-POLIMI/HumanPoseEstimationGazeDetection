@@ -6,11 +6,13 @@ In order to run the Gaze Estimation model it is needed at least Tensorflow 2.2. 
 In order to be sure that everything works fine, connect the USB HUB with NCS2 and Google Coral only after the boot of the Raspberry.
 
 # detection_estimation_myriad_coral.py
+Run the script using python3
 
 This is the debug script for visualization and extraction of information from all the models that are running simultaneously.
 It always makes available the theorical istantaneous FPS for Object Detection and for Pose Estimation + Gaze Estimation. Arguments can be ignored.
 
 # main_program.py
+Run the script using python3
 
 This is the script that actually implement all the control loop designed for the behavior of the robot. Arguments can be ignored.
 
