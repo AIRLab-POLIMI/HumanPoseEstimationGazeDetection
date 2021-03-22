@@ -3,11 +3,19 @@ import cv2
 from openvino.inference_engine import IENetwork, IECore
 import logging
 import sys
+import time
+import csv
+from datetime import datetime
 
 logging.basicConfig(format="[ %(levelname)s ] %(message)s",
                     level=logging.INFO,
                     stream=sys.stdout)
 log = logging.getLogger()
+
+n_session = datetime.now()
+n_session_str = n_session.strftime("%d_%b_%H_%M_%S")
+logDetector = 'LogDetector_' + n_session_str + '.csv'
+saveLogDet = True
 
 
 class Detector(object):
@@ -84,4 +92,9 @@ class Detector(object):
         img = self._preprocess(img)
         output = self._infer(img)
         bboxes, labels_detected, score_detected, bboxes_person, bboxes_teddy = self._postprocess(output[self._output_layer_name][0][0])
+        if saveLogDet:
+                with open(logDetector,'a') as fp:
+                        writer = csv.writer(fp)
+                        writer.writerow([time.time(), labels_detected, score_detected])
+                        #refer to models/ssdlite_mobilenet_v2/labels.txt in order to find the instance of the label
         return bboxes, labels_detected, score_detected, bboxes_person, bboxes_teddy

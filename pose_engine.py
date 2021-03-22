@@ -24,6 +24,14 @@ assert parse_version(edgetpu_version) >= parse_version('2.11.1'), \
 from edgetpu.basic.basic_engine import BasicEngine
 from edgetpu.utils import image_processing
 from PIL import Image
+import time
+from datetime import datetime
+import csv
+
+n_session = datetime.now()
+n_session_str = n_session.strftime("%d_%b_%H_%M_%S")
+logPoses = 'LogPoses_' + n_session_str + '.csv'
+saveLogPoses = False
 
 KEYPOINTS = (
   'nose',
@@ -145,5 +153,9 @@ class PoseEngine(BasicEngine):
                 if self._mirror: keypoint.yx[1] = self.image_width - keypoint.yx[1]
                 keypoint_dict[KEYPOINTS[point_i]] = keypoint
             poses.append(Pose(keypoint_dict, pose_scores[pose_i]))
-
+        if saveLogPoses:
+          with open(logPoses,'a') as fp:
+              writer = csv.writer(fp)
+              writer.writerow([time.time(), poses])
+              #Customize this
         return poses, inference_time

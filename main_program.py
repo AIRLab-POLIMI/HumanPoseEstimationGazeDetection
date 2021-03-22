@@ -438,8 +438,9 @@ def run_demo(args):
     
     #File saving stuff
     n_session = datetime.now()
-    n_session_str = n_session.strftime("%H_%M_%S")
-    fileWithAngles = 'JASession ' + n_session_str + '.csv'
+    n_session_str = n_session.strftime("%d_%b_%H_%M_%S")
+    fileWithAngles = 'logGaze_' + n_session_str + '.csv'
+    saveLogGaze = True
     
     
     #Camera Thread
@@ -577,6 +578,7 @@ def run_demo(args):
                     head, scores_head = elaborate_pose(res)
                     frame = overlay_on_image(frame, res, model_width, model_height, main_person, args.modality)
                     frame, gazeAngle, headCentroid, prediction = elaborate_gaze(frame, head, scores_head, model_gaze)
+                    conf_score_gazeAngle = np.exp(prediction[0,-1])
                     if headCentroid[1] == 0: gazeAngle = 0
                     if gazeAngle < 0: gazeAngle = 360 + gazeAngle
                     targetAngleMax = -360
@@ -596,10 +598,11 @@ def run_demo(args):
                             color = (0,255,0)
                             duration_LOOKING = duration_LOOKING + abs(actual_time_LOOKING - start_time_LOOKING)
                         start_time_LOOKING = actual_time_LOOKING
-                        with open(fileWithAngles,'a') as fp:
-                            hour = datetime.now()
-                            hour_string = hour.strftime("%H:%M:%S")
-                            fp.write(hour_string + ',' + str(targetAngleMin) + ',' + str(targetAngleMax) + ',' + str(gazeAngle) +'\n')
+                        if saveLogGaze:
+                            with open(fileWithAngles,'a') as fp:
+                                hour = datetime.now()
+                                hour_string = hour.strftime("%H:%M:%S")
+                                fp.write(hour_string + ',' + str(targetAngleMin) + ',' + str(targetAngleMax) + ',' + str(gazeAngle) + ',' + str(conf_score_gazeAngle) +'\n')
                 print("Time spent looking at the teddy: {:.1f}".format(duration_LOOKING))
                 if TaskCompleted:
                     functions_main.send_uno_lights(arduino.ser1, "happy")

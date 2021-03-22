@@ -7,6 +7,7 @@ import time
 import numpy as np
 import math
 from threading import Thread
+from datetime import datetime
 
 from edgetpu.basic import edgetpu_utils
 from pose_engine import PoseEngine
@@ -291,6 +292,10 @@ def run_demo(args):
                 labels.pop()
                 break
         file1.close()
+        
+    n_session = datetime.now()
+    n_session_str = n_session.strftime("%d_%b_%H_%M_%S")
+    logGaze = 'LogGaze_' + n_session_str + '.csv'
             
     # Posenet - Google Coral Inference
     print("#----- Loading Posenet - Coral Inference -----#")
@@ -319,6 +324,8 @@ def run_demo(args):
     time1 = 0
     time2 = 0
     imdraw = []
+    
+    saveLogGaze = True
     
     #Camera Thread
     vs = WebcamVideoStream(camera_width, camera_height, src=0).start()
@@ -404,6 +411,7 @@ def run_demo(args):
             else:
                 imdraw = overlay_on_image(color_image, res, model_width, model_height, main_person, args.modality)
                 imdraw, gazeAngle, headCentroid, prediction = elaborate_gaze(imdraw, head, scores_head, model_gaze)
+                conf_score_gazeAngle = np.exp(prediction[0,-1])
                 targetAngleMax = -360
                 targetAngleMin = 360
                 if targetBox:
@@ -418,8 +426,9 @@ def run_demo(args):
                                 print("update min")
                         if targetAngleMax < 0: targetAngleMax = 360 + targetAngleMax
                         if targetAngleMin < 0: targetAngleMin = 360 + targetAngleMin
-                        print(targetAngleMin, targetAngleMax)
-                        print(gazeAngle)
+                        if saveLogGaze:
+                            with open(logGaze,'a') as fp:
+                                fp.write(str(time.time()) + ',' + str(targetAngleMin) + ',' + str(targetAngleMax) + ',' + str(gazeAngle) + ' ' + str(conf_score_gazeAngle) +'\n')
                         if gazeAngle > (targetAngleMin-5) and gazeAngle < (targetAngleMax+5):
                             color = (0,255,0)
         else:
