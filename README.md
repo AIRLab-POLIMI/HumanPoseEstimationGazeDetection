@@ -1,4 +1,6 @@
 
+This is the work done by Dario Sortino, advised by prof.Andrea Bonarini to detect pose of a kid and gaze direction towards a recognized object to implement shared attention mechanisms with children with ASD.
+
 Be sure to install correctly OpenVino environment and EdgeTPU. Follow the documentation provided by Intel and Google.
 
 In order to run the Gaze Estimation model it is needed at least Tensorflow 2.2. Be sure to check http://github.com/PINTO0309/Tensorflow-bin
